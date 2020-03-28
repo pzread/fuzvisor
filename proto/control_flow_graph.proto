@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+message ControlFlowGraph {
+    message BasicBlock {
+        uint64 id = 1;
+        repeated uint64 successors = 2;
+    }
+
+    message Function {
+        uint64 id = 1;
+        string name = 2;
+        repeated BasicBlock basic_blocks = 3;
+    }
+
+    repeated Function functions = 1;
+}
