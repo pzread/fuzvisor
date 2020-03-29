@@ -1,0 +1,23 @@
+[package]
+name = "collector"
+version = "0.1.0"
+authors = ["PZ Read <netfirewall@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "collector"
+path = "src/libcollector/lib.rs"
+crate_type = ["dylib"]
+
+[[bin]]
+name = "collector-server"
+path = "src/server/main.rs"
+
+[dependencies]
+lazy_static = "1.4"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros"] }
+tonic = "0.2"
+
+[build-dependencies]
+tonic-build = "0.2.0"

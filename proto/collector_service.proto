@@ -1,0 +1,21 @@
+syntax = "proto3";
+package fuzzmon;
+
+import "control_flow_graph.proto";
+
+service CollectorService {
+  rpc CreateFuzzer(CreateFuzzerRequest) returns (CreateFuzzerResponse);
+
+  rpc UpdateFeatures(UpdateFeaturesRequest) returns (UpdateFeaturesResponse);
+}
+
+message CreateFuzzerRequest { ControlFlowGraph cfg = 1; }
+
+message CreateFuzzerResponse { uint64 id = 1; }
+
+message UpdateFeaturesRequest {
+  uint64 id = 1;
+  repeated uint32 features = 2;
+}
+
+message UpdateFeaturesResponse {}

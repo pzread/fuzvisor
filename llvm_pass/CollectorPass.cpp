@@ -20,18 +20,21 @@
 #include <string>
 #include <unordered_map>
 
+using namespace fuzzmon;
 using namespace llvm;
 
 namespace {
+static constexpr char kStartSanCovCntrsSymbol[] = "__start___sancov_cntrs";
+static constexpr char kSanCovCntrsSectionName[] = "__sancov_cntrs";
 static constexpr char kInitFuncName[] = "__fuzzmon_collector_init";
 static constexpr char kCtorFuncName[] = "fuzzmon.collector_ctor";
+static constexpr uint64_t kNoSancovIndex = std::numeric_limits<uint64_t>::max();
 static const int kCtorPriority = 573;
 
-static void ScanAndMarkSingleSanCov8bitCounter(
+static uint64_t ScanAndMarkSingleSanCov8bitCounter(
     const GlobalVariable &GV, const uint64_t StartMark,
     std::unordered_map<const BasicBlock *, uint64_t> *MarkMap) {
   uint64_t MaxMark = StartMark;
-
   for (const Use &U : GV.uses()) {
     const auto *CE = dyn_cast<ConstantExpr>(U.getUser());
     if (CE == nullptr || CE->getOpcode() != Instruction::GetElementPtr) {
@@ -51,23 +54,73 @@ static void ScanAndMarkSingleSanCov8bitCounter(
 
     uint64_t Mark = StartMark + CounterIndex;
     MarkMap->emplace(BB, Mark);
+    MaxMark = std::max(MaxMark, Mark);
   }
+  return MaxMark;
 }
 
-static const std::unordered_map<const BasicBlock *, uint64_t>
-ScanAndMarkSanCov8bitCounter(const Module &M) {
-  std::unordered_map<const BasicBlock *, uint64_t> MarkMap;
-  for (const GlobalVariable &GV : M.globals()) {
-    if (GV.getSection() != "__sancov_cntrs") {
+static void ScanAndMarkSanCov8bitCounter(
+    Module &M, std::unordered_map<const BasicBlock *, uint64_t> *MarkMap,
+    std::vector<std::pair<uint64_t, GlobalVariable *>> *RemapPoints) {
+  MarkMap->clear();
+  RemapPoints->clear();
+  uint64_t NextStartMark = 0;
+  for (GlobalVariable &GV : M.globals()) {
+    if (GV.getSection() != kSanCovCntrsSectionName) {
       continue;
     }
-    ScanAndMarkSingleSanCov8bitCounter(GV, MarkMap.size(), &MarkMap);
+    RemapPoints->emplace_back(NextStartMark, &GV);
+    NextStartMark =
+        ScanAndMarkSingleSanCov8bitCounter(GV, NextStartMark, MarkMap) + 1;
   }
-  return std::move(MarkMap);
 }
 
-static void AddCtorAndCallInit(Module *M, const ControlFlowGraph &Cfg) {
+static void AddRemapArray(
+    Module *M,
+    const std::vector<std::pair<uint64_t, GlobalVariable *>> &RemapPoints,
+    GlobalVariable **RemapStartGV, GlobalVariable **RemapAddressGV) {
   auto &C = M->getContext();
+
+  std::vector<uint64_t> RemapStarts;
+  std::vector<Constant *> RemapAddresses;
+  Constant *Zero = ConstantInt::get(Type::getInt32Ty(C), 0);
+  for (const auto RemapPoint : RemapPoints) {
+    GlobalVariable *RegionGV = RemapPoint.second;
+    auto RegionAddress = ConstantExpr::getInBoundsGetElementPtr(
+        RegionGV->getValueType(), RegionGV, ArrayRef<Constant *>({Zero, Zero}));
+    RemapStarts.push_back(RemapPoint.first);
+    RemapAddresses.push_back(RegionAddress);
+  }
+  auto *RemapStartArray = ConstantDataArray::get(
+      C, ArrayRef<uint64_t>(RemapStarts.data(), RemapStarts.size()));
+  *RemapStartGV =
+      new GlobalVariable(*M, RemapStartArray->getType(), true,
+                         GlobalValue::PrivateLinkage, RemapStartArray);
+  auto *RemapAddressArray = ConstantArray::get(
+      ArrayType::get(Type::getInt8PtrTy(C), RemapAddresses.size()),
+      ArrayRef<Constant *>(RemapAddresses.data(), RemapAddresses.size()));
+  *RemapAddressGV =
+      new GlobalVariable(*M, RemapAddressArray->getType(), true,
+                         GlobalValue::PrivateLinkage, RemapAddressArray);
+}
+
+static void BuildVoidFunction(LLVMContext &C, Function *F) {
+  auto *EntryBlock = BasicBlock::Create(C, /*Name=*/"", F);
+  IRBuilder<> IRB(EntryBlock, EntryBlock->getFirstInsertionPt());
+  IRB.CreateRetVoid();
+}
+
+static void AddCtorAndCallInit(
+    Module *M, const ControlFlowGraph &Cfg,
+    const std::vector<std::pair<uint64_t, GlobalVariable *>> &RemapPoints) {
+  auto &C = M->getContext();
+
+  GlobalVariable *RemapStartGV;
+  GlobalVariable *RemapAddressGV;
+  AddRemapArray(M, RemapPoints, &RemapStartGV, &RemapAddressGV);
+  auto RemapBaseAddress = ConstantExpr::getBitCast(
+      M->getGlobalVariable(kStartSanCovCntrsSymbol), Type::getInt8PtrTy(C));
+
   auto *CtorFuncType =
       FunctionType::get(Type::getVoidTy(C), /*isVarArg=*/false);
   auto *CtorFunc =
@@ -83,12 +136,34 @@ static void AddCtorAndCallInit(Module *M, const ControlFlowGraph &Cfg) {
       C,
       ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(CfgByteString.data()),
                         CfgByteString.size()));
-  auto *InitFuncType = FunctionType::get(
-      Type::getVoidTy(C), {CfgPayload->getType()}, /*isVarArg=*/false);
+  auto *CfgPayloadGV = new GlobalVariable(
+      *M, CfgPayload->getType(), true, GlobalValue::PrivateLinkage, CfgPayload);
+  Constant *Zero = ConstantInt::get(Type::getInt32Ty(C), 0);
+  Constant *CfgPayloadPtr = ConstantExpr::getInBoundsGetElementPtr(
+      CfgPayloadGV->getValueType(), CfgPayloadGV,
+      ArrayRef<Constant *>({Zero, Zero}));
+  Constant *RemapStartPtr = ConstantExpr::getInBoundsGetElementPtr(
+      RemapStartGV->getValueType(), RemapStartGV,
+      ArrayRef<Constant *>({Zero, Zero}));
+  Constant *RemapAddressPtr = ConstantExpr::getInBoundsGetElementPtr(
+      RemapAddressGV->getValueType(), RemapAddressGV,
+      ArrayRef<Constant *>({Zero, Zero}));
+  auto *InitFuncType =
+      FunctionType::get(Type::getVoidTy(C),
+                        {CfgPayloadPtr->getType(), Type::getInt64Ty(C),
+                         RemapStartPtr->getType(), RemapAddressPtr->getType(),
+                         Type::getInt64Ty(C), RemapBaseAddress->getType()},
+                        /*isVarArg=*/false);
   auto *InitFunc =
-      Function::Create(InitFuncType, GlobalValue::LinkageTypes::ExternalLinkage,
+      Function::Create(InitFuncType, GlobalValue::LinkageTypes::WeakAnyLinkage,
                        kInitFuncName, M);
-  IRB.CreateCall(InitFunc, {CfgPayload});
+  BuildVoidFunction(C, InitFunc);
+  IRB.CreateCall(InitFunc,
+                 {CfgPayloadPtr,
+                  ConstantInt::get(Type::getInt64Ty(C), CfgByteString.size()),
+                  RemapStartPtr, RemapAddressPtr,
+                  ConstantInt::get(Type::getInt64Ty(C), RemapPoints.size()),
+                  RemapBaseAddress});
 
   IRB.CreateRetVoid();
 
@@ -135,27 +210,24 @@ ControlFlowGraph::Function CollectorPass::BuildFunctionCFG(
 
   std::unordered_map<const BasicBlock *, ControlFlowGraph::BasicBlock *> BBMap;
   for (const BasicBlock &BB : F) {
-    const auto MarkI = MarkMap.find(&BB);
-    if (MarkI == MarkMap.end()) {
-      continue;
-    }
     auto *CfgBB = CfgF.add_basic_blocks();
-    CfgBB->set_id(MarkI->second);
+    CfgBB->set_id(GenerateID());
+
+    const auto MarkI = MarkMap.find(&BB);
+    if (MarkI != MarkMap.end()) {
+      CfgBB->set_sancov_index(MarkI->second);
+    } else {
+      CfgBB->set_sancov_index(kNoSancovIndex);
+    }
+
     BBMap.emplace(&BB, CfgBB);
   }
 
   for (const BasicBlock &BB : F) {
-    const auto CfgBBI = BBMap.find(&BB);
-    if (CfgBBI == BBMap.end()) {
-      continue;
-    }
-    auto *CfgBB = CfgBBI->second;
+    auto *CfgBB = BBMap.find(&BB)->second;
     for (auto BI = succ_begin(&BB), BE = succ_end(&BB); BI != BE; ++BI) {
-      const auto CfgSBBI = BBMap.find(*BI);
-      if (CfgSBBI == BBMap.end()) {
-        continue;
-      }
-      CfgBB->add_successors(CfgSBBI->second->id());
+      const auto *CfgSBB = BBMap.find(*BI)->second;
+      CfgBB->add_successors(CfgSBB->id());
     }
   }
 
@@ -166,6 +238,7 @@ ControlFlowGraph CollectorPass::BuildCFG(
     const Module &M,
     const std::unordered_map<const BasicBlock *, uint64_t> &MarkMap) {
   ControlFlowGraph Cfg;
+
   for (const Function &F : M) {
     const std::string FuncName = F.getName();
     if (F.size() == 0 || FuncName.find("sancov.") == 0) {
@@ -173,15 +246,22 @@ ControlFlowGraph CollectorPass::BuildCFG(
     }
     *Cfg.add_functions() = BuildFunctionCFG(F, MarkMap);
   }
+
   return std::move(Cfg);
 }
 
 bool CollectorPass::runOnModule(Module &M) {
-  const std::unordered_map<const BasicBlock *, uint64_t> MarkMap =
-      ScanAndMarkSanCov8bitCounter(M);
+  if (M.getFunction(kCtorFuncName) != nullptr ||
+      M.getGlobalVariable(kStartSanCovCntrsSymbol) == nullptr) {
+    return false;
+  }
+
+  std::unordered_map<const BasicBlock *, uint64_t> MarkMap;
+  std::vector<std::pair<uint64_t, GlobalVariable *>> RemapPoints;
+  ScanAndMarkSanCov8bitCounter(M, &MarkMap, &RemapPoints);
 
   const ControlFlowGraph Cfg = BuildCFG(M, MarkMap);
 
-  AddCtorAndCallInit(&M, Cfg);
+  AddCtorAndCallInit(&M, Cfg, RemapPoints);
   return true;
 }

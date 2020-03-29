@@ -1,9 +1,11 @@
 syntax = "proto3";
+package fuzzmon;
 
 message ControlFlowGraph {
     message BasicBlock {
         uint64 id = 1;
         repeated uint64 successors = 2;
+        uint64 sancov_index = 3;
     }
 
     message Function {
