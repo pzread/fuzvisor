@@ -17,7 +17,7 @@ mod client;
 mod common;
 use client::Client;
 use common::{
-    fuzzmon_proto::{
+    collector_proto::{
         control_flow_graph::{BasicBlock, Function},
         ControlFlowGraph, CreateFuzzerRequest, UpdateFeaturesRequest,
     },
@@ -61,7 +61,7 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn fuzzmon_libcollector_init(param_ptr: *const libcollector_param) {
+pub extern "C" fn fuzzer_client_init(param_ptr: *const libcollector_param) {
     initialize_service_client();
 
     let modules = unsafe {
@@ -100,7 +100,7 @@ pub extern "C" fn fuzzmon_libcollector_init(param_ptr: *const libcollector_param
 }
 
 #[no_mangle]
-pub extern "C" fn fuzzmon_libcollector_update_features(
+pub extern "C" fn fuzzer_client_update_features(
     features_ptr: *const u32,
     features_size: usize,
 ) {
@@ -157,7 +157,7 @@ fn concat_control_flow_graph(cfgs: Vec<ControlFlowGraph>) -> ControlFlowGraph {
                     successors: basic_block
                         .successors
                         .iter()
-                        .map(&mut block_id_mapper)
+                        .map(|successor| block_id_mapper(successor))
                         .collect(),
                     sancov_index: basic_block.sancov_index,
                 });

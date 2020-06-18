@@ -20,7 +20,7 @@
 #include "FuzzerMutate.h"
 #include "FuzzerRandom.h"
 #include "FuzzerTracePC.h"
-#include "Fuzzmon.h"
+#include "FuzzerClient.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -610,10 +610,11 @@ static Vector<SizedFile> ReadCorpora(const Vector<std::string> &CorpusDirs,
   return SizedFiles;
 }
 
-void CallFuzzmonLibCollectorInit() {
-  auto Modules = TPC.GetFuzzmonModules();
-  const fuzzmon::LibCollectorParam Param = {Modules.data(), Modules.size()};
-  fuzzmon_libcollector_init(&Param);
+void CallFuzzerClientInit() {
+  auto Modules = TPC.GetFuzzerClientModules();
+  const fuzzer_client::FuzzerClientParam Param = {Modules.data(),
+                                                  Modules.size()};
+  fuzzer_client_init(&Param);
 }
 
 int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
@@ -652,7 +653,7 @@ int FuzzerDriver(int *argc, char ***argv, UserCallback Callback) {
   if (Flags.workers > 0 && Flags.jobs > 0)
     return RunInMultipleProcesses(Args, Flags.workers, Flags.jobs);
 
-  CallFuzzmonLibCollectorInit();
+  CallFuzzerClientInit();
 
   FuzzingOptions Options;
   Options.Verbosity = Flags.verbosity;

@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(fuzzmon_collector)
+project(collector)
 
-add_custom_target(collector_lib
+add_custom_target(fuzzer_client
   COMMAND cargo build --release --lib --target-dir ${CMAKE_CURRENT_BINARY_DIR}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-set_property(TARGET collector_lib PROPERTY
-  FUZZMON_COLLECTOR_LIB_PATH ${CMAKE_CURRENT_BINARY_DIR}/release/libcollector.so)
+set_property(TARGET fuzzer_client PROPERTY
+  FUZZER_CLIENT_LIB_PATH ${CMAKE_CURRENT_BINARY_DIR}/release/libfuzzer_client.so)

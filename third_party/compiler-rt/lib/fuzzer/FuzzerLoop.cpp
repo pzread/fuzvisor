@@ -487,13 +487,13 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
     *FoundUniqFeatures = FoundUniqFeaturesOfII;
   PrintPulseAndReportSlowInput(Data, Size);
 
-  bool NeedToSample = !(FuzzmonSampleRng() & (16384 - 1));
+  bool NeedToSample = !(FuzzerClientSampleRng() & (16384 - 1));
   size_t NumNewFeatures = Corpus.NumFeatureUpdates() - NumUpdatesBefore;
   if (NeedToSample || NumNewFeatures) {
     TPC.CollectFeatures(
         [&](size_t Feature) { FullFeatureSetTmp.push_back(Feature); });
-    fuzzmon_libcollector_update_features(FullFeatureSetTmp.data(),
-                                         FullFeatureSetTmp.size());
+    fuzzer_client_update_features(FullFeatureSetTmp.data(),
+                                  FullFeatureSetTmp.size());
   }
   if (NumNewFeatures) {
     TPC.UpdateObservedPCs();

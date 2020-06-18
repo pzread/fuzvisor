@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::common::{
-    fuzzmon_proto::{control_flow_graph::BasicBlock, ControlFlowGraph},
+    collector_proto::{control_flow_graph::BasicBlock, ControlFlowGraph},
     NO_SANCOV_INDEX,
 };
 use std::{cmp, collections::HashMap};

@@ -15,12 +15,12 @@
 cmake_minimum_required(VERSION 3.10)
 include(ExternalProject)
 
-project(fuzzmon)
+project(fuzvisor)
 
 set(LLVM_PASS_BUILD_DIR
   ${CMAKE_CURRENT_BINARY_DIR}/llvm_pass/src/llvm_pass-build)
-set(FUZZMON_COLLECTOR_PASS_PATH
-  ${LLVM_PASS_BUILD_DIR}/libLLVMFuzzmonCollector.so)
+set(COLLECTOR_PASS_LIB_PATH
+  ${LLVM_PASS_BUILD_DIR}/libLLVMCollector.so)
 
 add_subdirectory(collector)
 add_subdirectory(third_party)

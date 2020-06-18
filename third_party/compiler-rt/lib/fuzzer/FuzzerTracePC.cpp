@@ -36,12 +36,13 @@ size_t TracePC::GetTotalPCCoverage() {
   return ObservedPCs.size();
 }
 
-std::vector<fuzzmon::Module> TracePC::GetFuzzmonModules() {
-  std::vector<fuzzmon::Module> Modules;
-  for (size_t Index = 0; Index < NumFuzzmonModules; ++Index) {
-    const FuzzmonInternalModule &InternalModule = FuzzmonModules[Index];
+std::vector<fuzzer_client::Module> TracePC::GetFuzzerClientModules() {
+  std::vector<fuzzer_client::Module> Modules;
+  for (size_t Index = 0; Index < NumFuzzerClientModules; ++Index) {
+    const FuzzerClientInternalModule &InternalModule =
+        FuzzerClientModules[Index];
 
-    fuzzmon::CfgRemapData CfgRemap;
+    fuzzer_client::CfgRemapData CfgRemap;
     CfgRemap.Starts = InternalModule.RemapStarts;
     uint64_t *Offsets = new uint64_t[InternalModule.RemapsSize];
     for (size_t RemapIndex = 0; RemapIndex < InternalModule.RemapsSize;
@@ -60,21 +61,21 @@ std::vector<fuzzmon::Module> TracePC::GetFuzzmonModules() {
   return std::move(Modules);
 }
 
-void TracePC::HandleFuzzmonCollectorInit(const uint8_t *CfgPayload,
-                                         size_t CfgPayloadSize,
-                                         const uint64_t *RemapStarts,
-                                         const uint8_t **RemapAddresses,
-                                         const int64_t RemapsSize,
-                                         const uint8_t *RemapBase) {
-  assert(NumFuzzmonModules <
-         sizeof(FuzzmonModules) / sizeof(FuzzmonModules[0]));
-  FuzzmonInternalModule Module;
+void TracePC::HandleCollectorInit(const uint8_t *CfgPayload,
+                                  size_t CfgPayloadSize,
+                                  const uint64_t *RemapStarts,
+                                  const uint8_t **RemapAddresses,
+                                  const uint64_t RemapsSize,
+                                  const uint8_t *RemapBase) {
+  assert(NumFuzzerClientModules <
+         sizeof(FuzzerClientModules) / sizeof(FuzzerClientModules[0]));
+  FuzzerClientInternalModule Module;
   Module.CfgPayload = {CfgPayload, CfgPayloadSize};
   Module.RemapStarts = RemapStarts;
   Module.RemapAddresses = RemapAddresses;
   Module.RemapsSize = RemapsSize;
   Module.RemapBase = RemapBase;
-  FuzzmonModules[NumFuzzmonModules++] = Module;
+  FuzzerClientModules[NumFuzzerClientModules++] = Module;
 }
 
 void TracePC::HandleInline8bitCountersInit(uint8_t *Start, uint8_t *Stop) {
@@ -449,15 +450,14 @@ extern "C" {
 
 ATTRIBUTE_INTERFACE
 ATTRIBUTE_NO_SANITIZE_ALL
-void __fuzzmon_collector_init(const uint8_t *CfgPayload,
-                              const uint64_t CfgPayloadSize,
-                              const uint64_t *RemapStarts,
-                              const uint8_t **RemapAddresses,
-                              const int64_t RemapsSize,
-                              const uint8_t *RemapBase) {
-  fuzzer::TPC.HandleFuzzmonCollectorInit(CfgPayload, CfgPayloadSize,
-                                         RemapStarts, RemapAddresses,
-                                         RemapsSize, RemapBase);
+void __fuzvisor_collector_init(const uint8_t *CfgPayload,
+                               const uint64_t CfgPayloadSize,
+                               const uint64_t *RemapStarts,
+                               const uint8_t **RemapAddresses,
+                               const uint64_t RemapsSize,
+                               const uint8_t *RemapBase) {
+  fuzzer::TPC.HandleCollectorInit(CfgPayload, CfgPayloadSize, RemapStarts,
+                                  RemapAddresses, RemapsSize, RemapBase);
 }
 
 ATTRIBUTE_INTERFACE

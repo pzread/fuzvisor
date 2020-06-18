@@ -6,12 +6,12 @@ license = "Apache-2.0"
 edition = "2018"
 
 [lib]
-name = "collector"
-path = "src/libcollector/lib.rs"
+name = "fuzzer_client"
+path = "src/fuzzer_client/lib.rs"
 crate_type = ["dylib"]
 
 [[bin]]
-name = "collector-server"
+name = "collector_server"
 path = "src/server/main.rs"
 
 [dependencies]

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef FUZZMON_H_
-#define FUZZMON_H_
+#ifndef FUZZER_CLIENT_H_
+#define FUZZER_CLIENT_H_
 
 #include <stdint.h>
 
-namespace fuzzmon {
+namespace fuzzer_client {
 
 struct CfgPayloadData {
   const uint8_t *Buffer;
@@ -37,17 +37,17 @@ struct Module {
   CfgRemapData CfgRemap;
 };
 
-struct LibCollectorParam {
+struct FuzzerClientParam {
   Module *Modules;
   size_t ModulesSize;
 };
 
-} // namespace fuzzmon
+} // namespace fuzzer_client
 
 extern "C" void
-fuzzmon_libcollector_init(const fuzzmon::LibCollectorParam *Param);
+fuzzer_client_init(const fuzzer_client::FuzzerClientParam *Param);
 
-extern "C" void fuzzmon_libcollector_update_features(const uint32_t *Features,
-                                                     size_t FeaturesSize);
+extern "C" void fuzzer_client_update_features(const uint32_t *Features,
+                                              size_t FeaturesSize);
 
-#endif // FUZZMON_H_
+#endif // FUZZER_CLIENT_H_

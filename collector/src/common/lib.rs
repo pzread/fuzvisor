@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod fuzzmon_proto {
-    tonic::include_proto!("fuzzmon");
+pub mod collector_proto {
+    tonic::include_proto!("collector");
 }
 
 pub const NO_SANCOV_INDEX: u64 = std::u64::MAX;

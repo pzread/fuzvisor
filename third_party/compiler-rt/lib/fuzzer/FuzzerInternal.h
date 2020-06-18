@@ -145,7 +145,7 @@ private:
   Vector<uint32_t> UniqFeatureSetTmp;
   Vector<uint32_t> FullFeatureSetTmp;
 
-  std::mt19937 FuzzmonSampleRng = std::mt19937(23);
+  std::mt19937 FuzzerClientSampleRng = std::mt19937(23);
 
   // Need to know our own thread.
   static thread_local bool IsMyThread;

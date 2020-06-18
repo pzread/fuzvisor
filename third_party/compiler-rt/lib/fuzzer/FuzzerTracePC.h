@@ -16,7 +16,7 @@
 #include "FuzzerDefs.h"
 #include "FuzzerDictionary.h"
 #include "FuzzerValueBitMap.h"
-#include "Fuzzmon.h"
+#include "FuzzerClient.h"
 
 #include <set>
 #include <unordered_map>
@@ -85,13 +85,11 @@ class TracePC {
   void UpdateObservedPCs();
   template <class Callback> void CollectFeatures(Callback CB) const;
 
-  void HandleFuzzmonCollectorInit(const uint8_t *CfgPayload,
-                                  size_t CfgPayloadSize,
-                                  const uint64_t *RemapStarts,
-                                  const uint8_t **RemapAddresses,
-                                  const int64_t RemapsSize,
-                                  const uint8_t *RemapBase);
-  std::vector<fuzzmon::Module> GetFuzzmonModules();
+  void HandleCollectorInit(const uint8_t *CfgPayload, size_t CfgPayloadSize,
+                           const uint64_t *RemapStarts,
+                           const uint8_t **RemapAddresses,
+                           const uint64_t RemapsSize, const uint8_t *RemapBase);
+  std::vector<fuzzer_client::Module> GetFuzzerClientModules();
 
   void ResetMaps() {
     ValueProfileMap.Reset();
@@ -170,15 +168,15 @@ private:
   size_t NumModules;  // linker-initialized.
   size_t NumInline8bitCounters;
 
-  struct FuzzmonInternalModule {
-    fuzzmon::CfgPayloadData CfgPayload;
+  struct FuzzerClientInternalModule {
+    fuzzer_client::CfgPayloadData CfgPayload;
     const uint64_t *RemapStarts;
     const uint8_t **RemapAddresses;
-    int64_t RemapsSize;
+    uint64_t RemapsSize;
     const uint8_t *RemapBase;
   };
-  FuzzmonInternalModule FuzzmonModules[4096];
-  size_t NumFuzzmonModules;
+  FuzzerClientInternalModule FuzzerClientModules[4096];
+  size_t NumFuzzerClientModules;
 
   template <class Callback>
   void IterateCounterRegions(Callback CB) {

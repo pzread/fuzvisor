@@ -5,15 +5,15 @@ diff -ur clang-10.0.0.src/CMakeLists.txt clang/CMakeLists.txt
  
  add_definitions( -D_GNU_SOURCE )
  
-+if(NOT DEFINED FUZZMON_COLLECTOR_LIB_PATH)
-+  message(FATAL_ERROR "FUZZMON_COLLECTOR_LIB_PATH is not set")
++if(NOT DEFINED FUZZER_CLIENT_LIB_PATH)
++  message(FATAL_ERROR "FUZZER_CLIENT_LIB_PATH is not set")
 +endif()
-+if(NOT DEFINED FUZZMON_COLLECTOR_PASS_PATH)
-+  message(FATAL_ERROR "FUZZMON_COLLECTOR_PASS_PATH is not set")
++if(NOT DEFINED COLLECTOR_PASS_LIB_PATH)
++  message(FATAL_ERROR "COLLECTOR_PASS_LIB_PATH is not set")
 +endif()
 +add_definitions(
-+  -DFUZZMON_COLLECTOR_LIB_PATH="${FUZZMON_COLLECTOR_LIB_PATH}"
-+  -DFUZZMON_COLLECTOR_PASS_PATH="${FUZZMON_COLLECTOR_PASS_PATH}")
++  -DFUZZER_CLIENT_LIB_PATH="${FUZZER_CLIENT_LIB_PATH}"
++  -DCOLLECTOR_PASS_LIB_PATH="${COLLECTOR_PASS_LIB_PATH}")
 +
  option(CLANG_BUILD_TOOLS
    "Build the Clang tools. If OFF, just generate build targets." ON)
@@ -25,12 +25,12 @@ diff -ur clang-10.0.0.src/lib/CodeGen/BackendUtil.cpp clang/lib/CodeGen/BackendU
    return Opts;
  }
  
-+static void addFuzzmonCollectorPass(const PassManagerBuilder &Builder,
-+                                    legacy::PassManagerBase &PM) {
++static void addCollectorPass(const PassManagerBuilder &Builder,
++                             legacy::PassManagerBase &PM) {
 +  llvm::sys::DynamicLibrary::LoadLibraryPermanently(
-+      FUZZMON_COLLECTOR_PASS_PATH);
++      COLLECTOR_PASS_LIB_PATH);
 +  const auto *PassInfo = PassRegistry::getPassRegistry()->getPassInfo(
-+      StringRef("fuzzmon-collector"));
++      StringRef("fuzvisor-collector"));
 +  assert(PassInfo != nullptr);
 +  PM.add(PassInfo->createPass());
 +}
@@ -43,9 +43,9 @@ diff -ur clang-10.0.0.src/lib/CodeGen/BackendUtil.cpp clang/lib/CodeGen/BackendU
      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                             addSanitizerCoveragePass);
 +    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-+                           addFuzzmonCollectorPass);
++                           addCollectorPass);
 +    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-+                           addFuzzmonCollectorPass);
++                           addCollectorPass);
    }
  
    if (LangOpts.Sanitize.has(SanitizerKind::Address)) {
@@ -57,7 +57,7 @@ diff -ur clang-10.0.0.src/lib/Driver/ToolChains/CommonArgs.cpp clang/lib/Driver/
      if (!Args.hasArg(clang::driver::options::OPT_nostdlibxx))
        TC.AddCXXStdlibLibArgs(Args, CmdArgs);
 +
-+    CmdArgs.push_back(Args.MakeArgString(FUZZMON_COLLECTOR_LIB_PATH));
++    CmdArgs.push_back(Args.MakeArgString(FUZZER_CLIENT_LIB_PATH));
    }
  
    for (auto RT : SharedRuntimes)

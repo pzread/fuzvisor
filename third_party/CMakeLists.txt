@@ -20,19 +20,19 @@ ExternalProject_Add(clang
   INSTALL_COMMAND ""
 )
 
-get_target_property(FUZZMON_COLLECTOR_LIB_PATH collector_lib FUZZMON_COLLECTOR_LIB_PATH)
+get_target_property(FUZZER_CLIENT_LIB_PATH fuzzer_client FUZZER_CLIENT_LIB_PATH)
 ExternalProject_Add(llvm
   URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/llvm-10.0.0.src.tar.xz"
   CMAKE_ARGS
-    -DFUZZMON_COLLECTOR_LIB_PATH=${FUZZMON_COLLECTOR_LIB_PATH}
-    -DFUZZMON_COLLECTOR_PASS_PATH=${FUZZMON_COLLECTOR_PASS_PATH}
+    -DFUZZER_CLIENT_LIB_PATH=${FUZZER_CLIENT_LIB_PATH}
+    -DCOLLECTOR_PASS_LIB_PATH=${COLLECTOR_PASS_LIB_PATH}
     -DLLVM_EXTERNAL_CLANG_SOURCE_DIR=${CMAKE_CURRENT_BINARY_DIR}/clang-prefix/src/clang
     -DLLVM_EXTERNAL_COMPILER_RT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/compiler-rt
     -DLLVM_EXTERNAL_PROJECTS=clang;compiler-rt
   BUILD_COMMAND cmake --build .
   BUILD_ALWAYS ON
   INSTALL_COMMAND ""
-  DEPENDS clang collector_lib
+  DEPENDS clang fuzzer_client
 )
 set_property(TARGET llvm
   PROPERTY BUILD_DIR

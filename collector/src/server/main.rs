@@ -15,7 +15,7 @@
 #[path = "../common/lib.rs"]
 mod common;
 mod fuzzer;
-use common::fuzzmon_proto::{
+use common::collector_proto::{
     collector_service_server::{CollectorService, CollectorServiceServer},
     CreateFuzzerRequest, CreateFuzzerResponse, UpdateFeaturesRequest, UpdateFeaturesResponse,
 };
@@ -65,9 +65,7 @@ impl CollectorService for CollectorServiceImpl {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:2501".parse().unwrap();
-
     println!("CollectorService listening on {}.", addr);
-
     Server::builder()
         .add_service(CollectorServiceServer::new(CollectorServiceImpl {
             fuzzer_map: Mutex::new(HashMap::new()),

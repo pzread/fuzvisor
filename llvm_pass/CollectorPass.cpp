@@ -34,14 +34,14 @@
 #include <string>
 #include <unordered_map>
 
-using namespace fuzzmon;
+using namespace collector;
 using namespace llvm;
 
 namespace {
 static constexpr char kStartSanCovCntrsSymbol[] = "__start___sancov_cntrs";
 static constexpr char kSanCovCntrsSectionName[] = "__sancov_cntrs";
-static constexpr char kInitFuncName[] = "__fuzzmon_collector_init";
-static constexpr char kCtorFuncName[] = "fuzzmon.collector_ctor";
+static constexpr char kInitFuncName[] = "__fuzvisor_collector_init";
+static constexpr char kCtorFuncName[] = "fuzvisor.collector_ctor";
 static constexpr uint64_t kNoSancovIndex = std::numeric_limits<uint64_t>::max();
 static const int kCtorPriority = 573;
 
@@ -209,7 +209,8 @@ private:
 } // namespace
 
 char CollectorPass::ID = 0;
-static RegisterPass<CollectorPass> X("fuzzmon-collector", "fuzzmon-collector",
+static RegisterPass<CollectorPass> X("fuzvisor-collector",
+                                     "fuzvisor-collector",
                                      false /* Only looks at CFG */,
                                      false /* Analysis Pass */);
 
