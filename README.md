@@ -1,10 +1,10 @@
 Fuzvisor
 =======
-A framwork provides an interface to monitor and control fuzzers.
+A framework provides an interface to monitor and control fuzzers.
 
 **DISCLAIMER:** This is not an officially supported Google product.
 
-Fuzvisor dumps the static prgoram structures (e.g. control flow graph) and loads them from a separated collecting server for analysis during fuzzing. The collecting server collects the coverage and performance from multiple fuzzing workers through lightweight and high-throughput gRPC protocol.
+Fuzvisor is not a fuzzer but a controller of fuzzers. Its collecting server gathers the performance and coverage from multiple fuzzing workers through high-throughput gRPC protocol. And useful static program structures (e.g. control flow graph) are dumped during compile time and loaded by the collecting server for analysis during fuzzing. This framework makes it easier to build and experiment complex fuzzing control algorithm on top of the existing fuzzers (e.g. libfuzzer).
 
 This project is still under heavy development.
 
@@ -27,9 +27,9 @@ Usage
 -----
 **Prepare the fuzzing target**
 
-Use the LLVM toolchain at `fuzvisor-build/toolchain/llvm-prefix/src/llvm-build/bin/` to compile your target with `libfuzzer`. For example:
+Use the LLVM toolchain at `fuzvisor-build/third_party/llvm-prefix/src/llvm-build/bin/` to compile your target with `libfuzzer`. For example:
 ```sh
-fuzvisor-build/toolchain/llvm-prefix/src/llvm-build/bin/clang -fsanitize=fuzzer -O a.out target.cpp
+fuzvisor-build/third_party/llvm-prefix/src/llvm-build/bin/clang -fsanitize=fuzzer -O a.out target.cpp
 ```
 
 **Start the collecting server**
