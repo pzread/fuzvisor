@@ -12,19 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "../common/lib.rs"]
-mod common;
 mod fuzzer;
 use common::collector_proto::{
-    collector_service_server::{CollectorService, CollectorServiceServer},
+    collector_service_server::CollectorService, collector_service_server::CollectorServiceServer,
     CreateFuzzerRequest, CreateFuzzerResponse, UpdateFeaturesRequest, UpdateFeaturesResponse,
 };
 use fuzzer::Fuzzer;
-use std::{collections::HashMap, sync::Mutex};
-use tonic::{transport::Server, Request, Response, Status};
+pub use fuzzer::Node;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+use tonic::{Request, Response, Status};
 
-struct CollectorServiceImpl {
+pub trait Observer {
+    fn create_fuzzer(&mut self, fuzzer_id: u64, graph: &[Node]);
+
+    fn update_nodes(&mut self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
+}
+
+pub type ObserverPtr = Arc<Mutex<dyn Observer + Send>>;
+
+pub struct CollectorServiceImpl {
     fuzzer_map: Mutex<HashMap<u64, Fuzzer>>,
+    observer: ObserverPtr,
 }
 
 #[tonic::async_trait]
@@ -35,11 +46,13 @@ impl CollectorService for CollectorServiceImpl {
     ) -> Result<Response<CreateFuzzerResponse>, Status> {
         let create_fuzzer_req = req.into_inner();
         let fuzzer = Fuzzer::new(create_fuzzer_req.cfg.unwrap());
-
         let mut fuzzer_map = self.fuzzer_map.lock().unwrap();
         let fuzzer_id = fuzzer_map.len() as u64;
+        self.observer
+            .lock()
+            .unwrap()
+            .create_fuzzer(fuzzer_id, fuzzer.get_nodes());
         fuzzer_map.insert(fuzzer_id, fuzzer);
-
         Ok(Response::new(CreateFuzzerResponse { id: fuzzer_id }))
     }
 
@@ -50,27 +63,24 @@ impl CollectorService for CollectorServiceImpl {
         let update_feature_req = req.into_inner();
         let fuzzer_id = update_feature_req.id;
         let features = update_feature_req.features;
-
-        self.fuzzer_map
+        let hit_bit_counters = self
+            .fuzzer_map
             .lock()
             .unwrap()
             .get_mut(&fuzzer_id)
             .unwrap()
             .update_features(&features);
-
+        self.observer
+            .lock()
+            .unwrap()
+            .update_nodes(fuzzer_id, &hit_bit_counters);
         Ok(Response::new(UpdateFeaturesResponse {}))
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:2501".parse().unwrap();
-    println!("CollectorService listening on {}.", addr);
-    Server::builder()
-        .add_service(CollectorServiceServer::new(CollectorServiceImpl {
-            fuzzer_map: Mutex::new(HashMap::new()),
-        }))
-        .serve(addr)
-        .await?;
-    Ok(())
+pub fn create_service(observer: ObserverPtr) -> CollectorServiceServer<CollectorServiceImpl> {
+    CollectorServiceServer::new(CollectorServiceImpl {
+        fuzzer_map: Mutex::new(HashMap::new()),
+        observer,
+    })
 }

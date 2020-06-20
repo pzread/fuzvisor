@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::common::collector_proto::collector_service_client::CollectorServiceClient;
+use common::collector_proto::collector_service_client::CollectorServiceClient;
 use std::{future::Future, mem::MaybeUninit};
 use tokio::runtime;
 

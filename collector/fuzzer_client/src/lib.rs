@@ -13,8 +13,6 @@
 // limitations under the License.
 
 mod client;
-#[path = "../common/lib.rs"]
-mod common;
 use client::Client;
 use common::{
     collector_proto::{
@@ -100,10 +98,7 @@ pub extern "C" fn fuzzer_client_init(param_ptr: *const libcollector_param) {
 }
 
 #[no_mangle]
-pub extern "C" fn fuzzer_client_update_features(
-    features_ptr: *const u32,
-    features_size: usize,
-) {
+pub extern "C" fn fuzzer_client_update_features(features_ptr: *const u32, features_size: usize) {
     let features = unsafe { std::slice::from_raw_parts(features_ptr, features_size).to_vec() };
     SERVICE_CLIENT
         .lock()

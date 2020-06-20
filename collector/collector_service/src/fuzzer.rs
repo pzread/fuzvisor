@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::common::{
+use common::{
     collector_proto::{control_flow_graph::BasicBlock, ControlFlowGraph},
     NO_SANCOV_INDEX,
 };
 use std::{cmp, collections::HashMap};
 
-struct Node {
-    predecessors: Vec<usize>,
-    successors: Vec<usize>,
+pub struct Node {
+    pub predecessors: Vec<usize>,
+    pub successors: Vec<usize>,
     bit_counter: u8,
     sancov_index: Option<u32>,
 }
@@ -81,7 +81,11 @@ impl Fuzzer {
         }
     }
 
-    pub fn update_features(&mut self, features: &[u32]) {
+    pub fn get_nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    pub fn update_features(&mut self, features: &[u32]) -> Vec<(usize, u8)> {
         let mut covered_sancov_indices: HashMap<u32, u8> = HashMap::new();
         for feature in features {
             let sancov_index = feature / 8;
@@ -90,6 +94,7 @@ impl Fuzzer {
                 *bit_counter |= 1 << (feature % 8);
             }
         }
+        let mut hit_bit_counters: HashMap<usize, u8> = HashMap::new();
         for (sancov_index, bit_counter) in covered_sancov_indices.iter() {
             if let Some(edges) = self.sancov_edge_dict.get(&sancov_index) {
                 for (dst, covered_nodes) in edges {
@@ -97,11 +102,14 @@ impl Fuzzer {
                         continue;
                     }
                     for node_index in covered_nodes {
-                        self.nodes[*node_index].bit_counter |= bit_counter;
+                        let updated_bit_counter = self.nodes[*node_index].bit_counter | bit_counter;
+                        self.nodes[*node_index].bit_counter = updated_bit_counter;
+                        hit_bit_counters.insert(*node_index, updated_bit_counter);
                     }
                 }
             }
         }
+        hit_bit_counters.into_iter().collect()
     }
 
     fn build_sancov_edge_dict(nodes: &[Node]) -> HashMap<u32, Vec<(u32, Vec<usize>)>> {

@@ -32,17 +32,20 @@ Use the LLVM toolchain at `fuzvisor-build/third_party/llvm-prefix/src/llvm-build
 fuzvisor-build/third_party/llvm-prefix/src/llvm-build/bin/clang -fsanitize=fuzzer -O a.out target.cpp
 ```
 
-**Start the collecting server**
+**Start the example coverage collecting server**
 ```sh
 cd fuzvisor/collector
-cargo run --release
+cargo run --release --example coverage_collector
 ```
+
 **Start the fuzzing target**
 
 Same as running a `libfuzzer` target. For example:
 ```sh
 ./a.out -use_value_profile=1 -jobs=16
 ```
+
+Then the collecting server will start showing the coverage information.
 
 Developer Guides (WIP)
 ---------------

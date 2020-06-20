@@ -1,0 +1,16 @@
+[package]
+name = "examples"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2018"
+
+[dependencies]
+collector_service = { path = "../collector_service" }
+lazy_static = "1.4"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros"] }
+tonic = "0.2"
+
+[[example]]
+name = "coverage_collector"
+path = "coverage_collector.rs"

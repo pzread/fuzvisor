@@ -1,24 +1,8 @@
-[package]
-name = "collector"
-version = "0.1.0"
-authors = ["PZ Read <netfirewall@gmail.com>"]
-license = "Apache-2.0"
-edition = "2018"
+[workspace]
 
-[lib]
-name = "fuzzer_client"
-path = "src/fuzzer_client/lib.rs"
-crate_type = ["dylib"]
-
-[[bin]]
-name = "collector_server"
-path = "src/server/main.rs"
-
-[dependencies]
-lazy_static = "1.4"
-prost = "0.6"
-tokio = { version = "0.2", features = ["macros"] }
-tonic = "0.2"
-
-[build-dependencies]
-tonic-build = "0.2.0"
+members = [
+    "collector_service",
+    "common",
+    "examples",
+    "fuzzer_client",
+]

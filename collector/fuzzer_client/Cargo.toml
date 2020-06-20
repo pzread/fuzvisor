@@ -1,0 +1,15 @@
+[package]
+name = "fuzzer_client"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2018"
+
+[lib]
+crate_type = ["cdylib"]
+
+[dependencies]
+common = { path = "../common" }
+lazy_static = "1.4"
+prost = "0.6"
+tokio = { version = "0.2" }
+tonic = "0.2"
