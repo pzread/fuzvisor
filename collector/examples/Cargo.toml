@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 collector_service = { path = "../collector_service" }
+common = { path = "../common" }
 lazy_static = "1.4"
 prost = "0.6"
 tokio = { version = "0.2", features = ["macros"] }

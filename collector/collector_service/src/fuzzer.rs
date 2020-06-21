@@ -13,16 +13,13 @@
 // limitations under the License.
 
 use common::{
-    collector_proto::{control_flow_graph::BasicBlock, ControlFlowGraph},
+    collector_proto::{structure_graph::Node as GraphNode, ControlFlowGraph, StructureGraph},
     NO_SANCOV_INDEX,
 };
 use std::{cmp, collections::HashMap};
 
-pub struct Node {
-    pub predecessors: Vec<usize>,
-    pub successors: Vec<usize>,
+struct Node {
     bit_counter: u8,
-    sancov_index: Option<u32>,
 }
 
 pub struct Fuzzer {
@@ -32,57 +29,31 @@ pub struct Fuzzer {
 }
 
 impl Fuzzer {
-    pub fn new(cfg: ControlFlowGraph) -> Self {
-        let mut blocks: Vec<&BasicBlock> = cfg
+    pub fn new(struct_graph: &StructureGraph, cfg: ControlFlowGraph) -> Self {
+        let node_sancov_map: HashMap<usize, u32> = cfg
             .functions
             .iter()
-            .flat_map(|function| function.basic_blocks.iter())
-            .collect();
-        blocks.sort_by_key(|block| block.id);
-
-        let mut nodes: Vec<Node> = blocks
-            .iter()
-            .map(|block| Node {
-                predecessors: Vec::new(),
-                successors: {
-                    let mut successors: Vec<usize> =
-                        block.successors.iter().map(|succ| *succ as usize).collect();
-                    successors.dedup();
-                    successors
-                },
-                bit_counter: 0,
-                sancov_index: match block.sancov_index {
-                    NO_SANCOV_INDEX => None,
-                    sancov_index => Some(sancov_index as u32),
-                },
+            .map(|function| function.basic_blocks.iter())
+            .flatten()
+            .filter_map(|block| match block.sancov_index {
+                NO_SANCOV_INDEX => None,
+                sancov_index => Some((block.id as usize, sancov_index as u32)),
             })
             .collect();
-        for node_index in 0..nodes.len() {
-            let successors = nodes[node_index].successors.clone();
-            for successor in successors {
-                nodes[successor].predecessors.push(node_index);
-            }
-        }
-
-        let sancov_index_map: HashMap<u32, usize> = nodes
+        let nodes: Vec<Node> = struct_graph
+            .nodes
             .iter()
-            .enumerate()
-            .filter_map(|(node_index, node)| {
-                node.sancov_index
-                    .map(|sancov_index| (sancov_index, node_index))
-            })
+            .map(|_| Node { bit_counter: 0 })
             .collect();
-        let sancov_edge_dict = Self::build_sancov_edge_dict(&nodes);
 
         Self {
             nodes,
-            sancov_index_map,
-            sancov_edge_dict,
+            sancov_index_map: node_sancov_map
+                .iter()
+                .map(|(node_index, sancov_index)| (*sancov_index, *node_index))
+                .collect(),
+            sancov_edge_dict: Self::build_sancov_edge_dict(&struct_graph.nodes, &node_sancov_map),
         }
-    }
-
-    pub fn get_nodes(&self) -> &[Node] {
-        &self.nodes
     }
 
     pub fn update_features(&mut self, features: &[u32]) -> Vec<(usize, u8)> {
@@ -112,22 +83,26 @@ impl Fuzzer {
         hit_bit_counters.into_iter().collect()
     }
 
-    fn build_sancov_edge_dict(nodes: &[Node]) -> HashMap<u32, Vec<(u32, Vec<usize>)>> {
+    fn build_sancov_edge_dict(
+        graph_nodes: &[GraphNode],
+        node_sancov_map: &HashMap<usize, u32>,
+    ) -> HashMap<u32, Vec<(u32, Vec<usize>)>> {
         let mut sancov_edge_map: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
-        let mut visiting_map = vec![NO_SANCOV_INDEX; nodes.len()];
-        for (node_index, node) in nodes.iter().enumerate() {
-            if let Some(source_sancov_index) = node.sancov_index {
+        let mut visiting_map = vec![NO_SANCOV_INDEX; graph_nodes.len()];
+        for node_index in 0..graph_nodes.len() {
+            if let Some(source_sancov_index) = node_sancov_map.get(&node_index) {
                 let mut path = Vec::new();
                 Self::path_traverse(
-                    nodes,
+                    graph_nodes,
+                    node_sancov_map,
                     node_index,
-                    source_sancov_index,
+                    *source_sancov_index,
                     &mut path,
                     &mut sancov_edge_map,
                     &mut visiting_map,
                 );
             } else {
-                assert!(!node.predecessors.is_empty());
+                assert!(!graph_nodes[node_index].predecessors.is_empty());
             }
         }
         let mut sancov_edge_dict: HashMap<u32, Vec<(u32, Vec<usize>)>> = HashMap::new();
@@ -141,20 +116,21 @@ impl Fuzzer {
     }
 
     fn path_traverse(
-        nodes: &[Node],
+        graph_nodes: &[GraphNode],
+        node_sancov_map: &HashMap<usize, u32>,
         node_index: usize,
         source_sancov_index: u32,
         path: &mut Vec<usize>,
         sancov_edge_map: &mut HashMap<(u32, u32), Vec<usize>>,
         visiting_map: &mut Vec<u64>,
     ) {
-        let node = &nodes[node_index];
         path.push(node_index);
-        if (path.len() > 1 && node.sancov_index.is_some())
-            || node.successors.is_empty()
+        let sancov_index = node_sancov_map.get(&node_index).copied();
+        if (path.len() > 1 && sancov_index.is_some())
+            || graph_nodes[node_index].successors.is_empty()
             || visiting_map[node_index] == source_sancov_index as u64
         {
-            let sancov_index = node.sancov_index.unwrap_or(source_sancov_index);
+            let sancov_index = sancov_index.unwrap_or(source_sancov_index);
             let edge_path = sancov_edge_map
                 .entry((
                     cmp::min(source_sancov_index, sancov_index),
@@ -165,10 +141,11 @@ impl Fuzzer {
             edge_path.dedup();
         } else {
             visiting_map[node_index] = source_sancov_index as u64;
-            for successor in node.successors.iter() {
+            for successor in graph_nodes[node_index].successors.iter() {
                 Self::path_traverse(
-                    nodes,
-                    *successor,
+                    graph_nodes,
+                    node_sancov_map,
+                    *successor as usize,
                     source_sancov_index,
                     path,
                     sancov_edge_map,

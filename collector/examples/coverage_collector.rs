@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use common::collector_proto::StructureGraph;
 use std::sync::{Arc, Mutex};
 use tonic::transport::Server;
 
@@ -21,9 +22,9 @@ struct Observer {
 }
 
 impl collector_service::Observer for Observer {
-    fn create_fuzzer(&mut self, fuzzer_id: u64, graph: &[collector_service::Node]) {
+    fn create_fuzzer(&mut self, fuzzer_id: u64, struct_graph: &StructureGraph) {
         if fuzzer_id == 0 {
-            self.nodes = vec![false; graph.len()];
+            self.nodes = vec![false; struct_graph.nodes.len()];
         }
     }
 

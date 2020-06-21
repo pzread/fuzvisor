@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::configure().compile(
-        &[
-            "../../proto/control_flow_graph.proto",
-            "../../proto/collector_service.proto",
-            "../../proto/structure_graph.proto",
-        ],
-        &["../../proto"],
-    )?;
-    Ok(())
+syntax = "proto3";
+package collector;
+
+message StructureGraph {
+    message Node {
+        repeated uint64 predecessors = 1;
+        repeated uint64 successors = 2;
+    }
+
+    message Function {
+        string name = 1;
+        repeated uint64 node_indices = 2;
+    }
+
+    repeated Node nodes = 1;
+    repeated Function functions = 2;
 }
