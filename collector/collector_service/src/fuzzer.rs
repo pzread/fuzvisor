@@ -16,8 +16,9 @@ use common::{
     collector_proto::{structure_graph::Node as GraphNode, ControlFlowGraph, StructureGraph},
     NO_SANCOV_INDEX,
 };
-use std::{cmp, collections::HashMap};
+use std::{cmp, collections::HashMap, iter};
 
+#[derive(Clone)]
 struct Node {
     bit_counter: u8,
 }
@@ -40,14 +41,10 @@ impl Fuzzer {
                 sancov_index => Some((block.id as usize, sancov_index as u32)),
             })
             .collect();
-        let nodes: Vec<Node> = struct_graph
-            .nodes
-            .iter()
-            .map(|_| Node { bit_counter: 0 })
-            .collect();
-
         Self {
-            nodes,
+            nodes: iter::repeat(Node { bit_counter: 0 })
+                .take(struct_graph.nodes.len())
+                .collect(),
             sancov_index_map: node_sancov_map
                 .iter()
                 .map(|(node_index, sancov_index)| (*sancov_index, *node_index))
