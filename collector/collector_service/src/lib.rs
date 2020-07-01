@@ -17,8 +17,9 @@ use async_trait::async_trait;
 use common::{
     collector_proto::{
         collector_service_server::CollectorService,
-        collector_service_server::CollectorServiceServer, ControlFlowGraph, CreateFuzzerRequest,
-        CreateFuzzerResponse, UpdateFeaturesRequest, UpdateFeaturesResponse,
+        collector_service_server::CollectorServiceServer, update_features_response::CorpusPriority,
+        ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, UpdateFeaturesRequest,
+        UpdateFeaturesResponse,
     },
     observer_proto::{
         structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
@@ -39,7 +40,7 @@ pub trait Observer {
         fuzzer_id: u64,
         bit_counters: &[(usize, u8)],
         corpus_id: Option<u64>,
-    );
+    ) -> Vec<(u64, u32)>;
 }
 
 pub type ObserverPtr = Box<dyn Observer + Sync + Send>;
@@ -90,12 +91,19 @@ impl CollectorService for CollectorServiceImpl {
             .get_mut(&fuzzer_id)
             .unwrap()
             .update_features(&features);
-        self.observer
+        let corpus_priorities = self
+            .observer
             .update_features(fuzzer_id, &hit_bit_counters, corpus_id)
             .await;
 
         Ok(Response::new(UpdateFeaturesResponse {
-            corpus_priorities: Vec::new(),
+            corpus_priorities: corpus_priorities
+                .iter()
+                .map(|&(corpus_id, priority)| CorpusPriority {
+                    id: corpus_id,
+                    priority,
+                })
+                .collect(),
         }))
     }
 }
