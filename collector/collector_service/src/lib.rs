@@ -15,10 +15,11 @@
 mod fuzzer;
 use common::collector_proto::{
     collector_service_server::CollectorService, collector_service_server::CollectorServiceServer,
-    CreateFuzzerRequest, CreateFuzzerResponse, UpdateFeaturesRequest, UpdateFeaturesResponse,
+    structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
+    ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, StructureGraph,
+    UpdateFeaturesRequest, UpdateFeaturesResponse,
 };
 use fuzzer::Fuzzer;
-pub use fuzzer::Node;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -26,7 +27,7 @@ use std::{
 use tonic::{Request, Response, Status};
 
 pub trait Observer {
-    fn create_fuzzer(&mut self, fuzzer_id: u64, graph: &[Node]);
+    fn create_fuzzer(&mut self, fuzzer_id: u64, struct_graph: &StructureGraph);
 
     fn update_nodes(&mut self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
 }
@@ -45,14 +46,19 @@ impl CollectorService for CollectorServiceImpl {
         req: Request<CreateFuzzerRequest>,
     ) -> Result<Response<CreateFuzzerResponse>, Status> {
         let create_fuzzer_req = req.into_inner();
-        let fuzzer = Fuzzer::new(create_fuzzer_req.cfg.unwrap());
+        let cfg = create_fuzzer_req.cfg.unwrap();
+
+        let struct_graph = build_structure_graph(&cfg);
+        let fuzzer = Fuzzer::new(&struct_graph, cfg);
         let mut fuzzer_map = self.fuzzer_map.lock().unwrap();
         let fuzzer_id = fuzzer_map.len() as u64;
+        fuzzer_map.insert(fuzzer_id, fuzzer);
+
         self.observer
             .lock()
             .unwrap()
-            .create_fuzzer(fuzzer_id, fuzzer.get_nodes());
-        fuzzer_map.insert(fuzzer_id, fuzzer);
+            .create_fuzzer(fuzzer_id, &struct_graph);
+
         Ok(Response::new(CreateFuzzerResponse { id: fuzzer_id }))
     }
 
@@ -83,4 +89,44 @@ pub fn create_service(observer: ObserverPtr) -> CollectorServiceServer<Collector
         fuzzer_map: Mutex::new(HashMap::new()),
         observer,
     })
+}
+
+fn build_structure_graph(cfg: &ControlFlowGraph) -> StructureGraph {
+    let mut node_pairs = Vec::new();
+    let mut functions = Vec::new();
+    for cfg_function in cfg.functions.iter() {
+        let mut node_indices = Vec::new();
+        for cfg_block in cfg_function.basic_blocks.iter() {
+            let node_index = cfg_block.id;
+            node_indices.push(node_index);
+            node_pairs.push((
+                node_index,
+                GraphNode {
+                    predecessors: Vec::new(),
+                    successors: {
+                        let mut successors = cfg_block.successors.clone();
+                        successors.dedup();
+                        successors
+                    },
+                },
+            ))
+        }
+        functions.push(GraphFunction {
+            name: cfg_function.name.clone(),
+            node_indices,
+        })
+    }
+    node_pairs.sort_by_key(|(node_index, _)| *node_index);
+    let mut nodes: Vec<GraphNode> = node_pairs
+        .into_iter()
+        .map(|(_, graph_node)| graph_node)
+        .collect();
+    for node_index in 0..nodes.len() {
+        for successor in nodes[node_index].successors.clone() {
+            nodes[successor as usize]
+                .predecessors
+                .push(node_index as u64);
+        }
+    }
+    StructureGraph { nodes, functions }
 }
