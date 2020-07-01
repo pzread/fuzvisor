@@ -17,12 +17,13 @@ use std::{future::Future, mem::MaybeUninit};
 use tokio::runtime;
 
 pub struct Client {
+    server_url: String,
     runtime: runtime::Runtime,
     client: MaybeUninit<CollectorServiceClient<tonic::transport::channel::Channel>>,
 }
 
 impl Client {
-    pub fn new() -> Self {
+    pub fn new(server_url: &str) -> Self {
         let runtime = runtime::Builder::new()
             .basic_scheduler()
             .core_threads(1)
@@ -30,15 +31,17 @@ impl Client {
             .build()
             .unwrap();
         Self {
+            server_url: server_url.to_owned(),
             runtime,
             client: MaybeUninit::zeroed(),
         }
     }
 
     pub fn connect(&mut self) {
+        let server_url = self.server_url.clone();
         let client = self
             .runtime
-            .block_on(async { CollectorServiceClient::connect("http://[::1]:2501").await })
+            .block_on(async { CollectorServiceClient::connect(server_url).await })
             .unwrap();
         self.client = MaybeUninit::new(client);
     }
