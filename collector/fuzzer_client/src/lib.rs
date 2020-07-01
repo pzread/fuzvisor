@@ -25,41 +25,47 @@ use lazy_static::lazy_static;
 use prost::Message;
 use std::{
     collections::HashMap,
+    env,
     sync::atomic::{AtomicU64, Ordering},
     sync::Mutex,
 };
 
+const SERVER_URL_ENV: &str = "FUZVISOR_SERVER_URL";
+const DEFAULT_SERVER_URL: &str = "http://[::1]:2501";
+
 #[repr(C)]
-struct libcollector_param_cfg_payload_data {
+struct fuzzer_client_param_cfg_payload_data {
     buffer: *const u8,
     size: usize,
 }
 
 #[repr(C)]
-struct libcollector_param_cfg_remap_data {
+struct fuzzer_client_param_cfg_remap_data {
     starts: *const u64,
     offsets: *const u64,
     size: usize,
 }
 #[repr(C)]
-struct libcollector_param_module {
-    cfg_payload: libcollector_param_cfg_payload_data,
-    cfg_remap: libcollector_param_cfg_remap_data,
+struct fuzzer_client_param_module {
+    cfg_payload: fuzzer_client_param_cfg_payload_data,
+    cfg_remap: fuzzer_client_param_cfg_remap_data,
 }
 
 #[repr(C)]
-pub struct libcollector_param {
-    modules: *const libcollector_param_module,
+pub struct fuzzer_client_param {
+    modules: *const fuzzer_client_param_module,
     modules_size: usize,
 }
 
 static FUZZER_ID: AtomicU64 = AtomicU64::new(std::u64::MAX);
 lazy_static! {
-    static ref SERVICE_CLIENT: Mutex<Client> = Mutex::new(Client::new());
+    static ref SERVICE_CLIENT: Mutex<Client> = Mutex::new(Client::new(
+        &env::var(SERVER_URL_ENV.to_owned()).unwrap_or(DEFAULT_SERVER_URL.to_owned())
+    ));
 }
 
 #[no_mangle]
-pub extern "C" fn fuzzer_client_init(param_ptr: *const libcollector_param) {
+pub extern "C" fn fuzzer_client_init(param_ptr: *const fuzzer_client_param) {
     initialize_service_client();
 
     let modules = unsafe {
