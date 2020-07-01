@@ -74,7 +74,7 @@ impl collector_service::Observer for Observer {
         _fuzzer_id: u64,
         bit_counters: &[(usize, u8)],
         corpus_id: Option<u64>,
-    ) {
+    ) -> Vec<(u64, u32)> {
         let mut new_update = false;
         let mut new_function_names = Vec::new();
         for &(node_index, _) in bit_counters {
@@ -120,6 +120,7 @@ impl collector_service::Observer for Observer {
         if !new_function_names.is_empty() {
             println!("New Functions: {:?}", new_function_names);
         }
+        Vec::new()
     }
 }
 

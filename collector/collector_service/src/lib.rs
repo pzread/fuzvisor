@@ -18,8 +18,8 @@ use common::{
         collector_service_server::CollectorService,
         collector_service_server::CollectorServiceServer,
         structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
-        ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, StructureGraph,
-        UpdateFeaturesRequest, UpdateFeaturesResponse,
+        update_features_response::CorpusPriority, ControlFlowGraph, CreateFuzzerRequest,
+        CreateFuzzerResponse, StructureGraph, UpdateFeaturesRequest, UpdateFeaturesResponse,
     },
     NO_CORPUS_ID,
 };
@@ -38,7 +38,7 @@ pub trait Observer {
         fuzzer_id: u64,
         bit_counters: &[(usize, u8)],
         corpus_id: Option<u64>,
-    );
+    ) -> Vec<(u64, u32)>;
 }
 
 pub type ObserverPtr = Arc<Mutex<dyn Observer + Send>>;
@@ -89,12 +89,19 @@ impl CollectorService for CollectorServiceImpl {
             .get_mut(&fuzzer_id)
             .unwrap()
             .update_features(&features);
-        self.observer
-            .lock()
-            .unwrap()
-            .update_nodes(fuzzer_id, &hit_bit_counters, corpus_id);
+        let corpus_priorities =
+            self.observer
+                .lock()
+                .unwrap()
+                .update_nodes(fuzzer_id, &hit_bit_counters, corpus_id);
         Ok(Response::new(UpdateFeaturesResponse {
-            corpus_priorities: Vec::new(),
+            corpus_priorities: corpus_priorities
+                .iter()
+                .map(|&(corpus_id, priority)| CorpusPriority {
+                    id: corpus_id,
+                    priority,
+                })
+                .collect(),
         }))
     }
 }
