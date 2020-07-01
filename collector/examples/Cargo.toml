@@ -16,3 +16,7 @@ tonic = "0.2"
 [[example]]
 name = "coverage_collector"
 path = "coverage_collector.rs"
+
+[[example]]
+name = "low_freq_high_prio"
+path = "low_freq_high_prio.rs"

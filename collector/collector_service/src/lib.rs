@@ -98,8 +98,8 @@ impl CollectorService for CollectorServiceImpl {
 
         Ok(Response::new(UpdateFeaturesResponse {
             corpus_priorities: corpus_priorities
-                .iter()
-                .map(|&(corpus_id, priority)| CorpusPriority {
+                .into_iter()
+                .map(|(corpus_id, priority)| CorpusPriority {
                     id: corpus_id,
                     priority,
                 })
@@ -147,10 +147,8 @@ fn build_structure_graph(cfg: &ControlFlowGraph) -> StructureGraph {
         .collect();
     for node_index in 0..nodes.len() {
         for successor_index in 0..nodes[node_index].successors.len() {
-            let successor = nodes[node_index].successors[successor_index];
-            nodes[successor as usize]
-                .predecessors
-                .push(node_index as u64);
+            let successor = nodes[node_index].successors[successor_index] as usize;
+            nodes[successor].predecessors.push(node_index as u64);
         }
     }
     StructureGraph { nodes, functions }
