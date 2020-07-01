@@ -58,31 +58,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .takes_value(true)
                 .required(true)
                 .long("listen_addr")
-                .help("Set collector listening address:port")
+                .help("Set collector listening address:port"),
         )
         .arg(
             Arg::with_name("observer_url")
                 .takes_value(true)
                 .required(true)
                 .long("observer_url")
-                .help("Set observer server url")
+                .help("Set observer server url"),
         )
         .get_matches();
 
     let observer_url = args.value_of("observer_url").unwrap().to_owned();
-    let client = ObserverServiceClient::connect(observer_url)
-        .await
-        .unwrap();
+    let client = ObserverServiceClient::connect(observer_url).await.unwrap();
 
     let observer_ptr = Box::new(Proxy {
         client: Mutex::new(client),
     });
 
-    let addr = args
-        .value_of("listen_addr")
-        .unwrap()
-        .parse()
-        .unwrap();
+    let addr = args.value_of("listen_addr").unwrap().parse().unwrap();
     println!("Observer Proxy listening on {}.", addr);
     Server::builder()
         .add_service(collector_service::create_service(observer_ptr))

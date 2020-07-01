@@ -24,6 +24,7 @@ use common::{
         structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
         StructureGraph,
     },
+    NO_CORPUS_ID,
 };
 use fuzzer::Fuzzer;
 use std::{collections::HashMap, sync::Mutex};
@@ -33,7 +34,12 @@ use tonic::{Request, Response, Status};
 pub trait Observer {
     async fn create_fuzzer(&self, fuzzer_id: u64, struct_graph: &StructureGraph);
 
-    async fn update_features(&self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
+    async fn update_features(
+        &self,
+        fuzzer_id: u64,
+        bit_counters: &[(usize, u8)],
+        corpus_id: Option<u64>,
+    );
 }
 
 pub type ObserverPtr = Box<dyn Observer + Sync + Send>;
@@ -72,6 +78,10 @@ impl CollectorService for CollectorServiceImpl {
         let update_feature_req = req.into_inner();
         let fuzzer_id = update_feature_req.id;
         let features = update_feature_req.features;
+        let corpus_id = match update_feature_req.corpus_id {
+            NO_CORPUS_ID => None,
+            corpus_id => Some(corpus_id),
+        };
 
         let hit_bit_counters = self
             .fuzzer_map
@@ -81,10 +91,12 @@ impl CollectorService for CollectorServiceImpl {
             .unwrap()
             .update_features(&features);
         self.observer
-            .update_features(fuzzer_id, &hit_bit_counters)
+            .update_features(fuzzer_id, &hit_bit_counters, corpus_id)
             .await;
 
-        Ok(Response::new(UpdateFeaturesResponse {}))
+        Ok(Response::new(UpdateFeaturesResponse {
+            corpus_priorities: Vec::new(),
+        }))
     }
 }
 

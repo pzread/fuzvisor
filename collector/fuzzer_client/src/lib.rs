@@ -17,15 +17,17 @@ use client::Client;
 use common::{
     collector_proto::{
         control_flow_graph::{BasicBlock, Function},
+        update_features_response::CorpusPriority,
         ControlFlowGraph, CreateFuzzerRequest, UpdateFeaturesRequest,
     },
-    NO_SANCOV_INDEX,
+    NO_CORPUS_ID, NO_SANCOV_INDEX,
 };
 use lazy_static::lazy_static;
 use prost::Message;
 use std::{
+    cell::RefCell,
     collections::HashMap,
-    env,
+    env, slice,
     sync::atomic::{AtomicU64, Ordering},
     sync::Mutex,
 };
@@ -57,6 +59,12 @@ pub struct fuzzer_client_param {
     modules_size: usize,
 }
 
+#[repr(C)]
+pub struct fuzzer_client_corpus_priority {
+    index: usize,
+    priority: u32,
+}
+
 static FUZZER_ID: AtomicU64 = AtomicU64::new(std::u64::MAX);
 lazy_static! {
     static ref SERVICE_CLIENT: Mutex<Client> = Mutex::new(Client::new(
@@ -64,24 +72,26 @@ lazy_static! {
     ));
 }
 
+thread_local!(static PENDING_CORPUS_PRIORITIES: RefCell<Vec<CorpusPriority>> = RefCell::new(Vec::new()));
+
 #[no_mangle]
 pub extern "C" fn fuzzer_client_init(param_ptr: *const fuzzer_client_param) {
     initialize_service_client();
 
     let modules = unsafe {
         let param = &*param_ptr;
-        std::slice::from_raw_parts(param.modules, param.modules_size)
+        slice::from_raw_parts(param.modules, param.modules_size)
     };
 
     let cfgs: Vec<ControlFlowGraph> = modules
         .iter()
         .map(|module| unsafe {
             let remap_starts =
-                std::slice::from_raw_parts(module.cfg_remap.starts, module.cfg_remap.size);
+                slice::from_raw_parts(module.cfg_remap.starts, module.cfg_remap.size);
             let remap_offsets =
-                std::slice::from_raw_parts(module.cfg_remap.offsets, module.cfg_remap.size);
+                slice::from_raw_parts(module.cfg_remap.offsets, module.cfg_remap.size);
             let cfg_payload =
-                std::slice::from_raw_parts(module.cfg_payload.buffer, module.cfg_payload.size);
+                slice::from_raw_parts(module.cfg_payload.buffer, module.cfg_payload.size);
             let mut cfg = ControlFlowGraph::decode(cfg_payload).unwrap();
             remap_sancov_index(&mut cfg, &remap_starts, &remap_offsets);
             cfg
@@ -104,18 +114,52 @@ pub extern "C" fn fuzzer_client_init(param_ptr: *const fuzzer_client_param) {
 }
 
 #[no_mangle]
-pub extern "C" fn fuzzer_client_update_features(features_ptr: *const u32, features_size: usize) {
-    let features = unsafe { std::slice::from_raw_parts(features_ptr, features_size).to_vec() };
-    SERVICE_CLIENT
+pub extern "C" fn fuzzer_client_update_features(
+    features_ptr: *const u32,
+    features_size: usize,
+    corpus_index: usize,
+) {
+    let features = unsafe { slice::from_raw_parts(features_ptr, features_size).to_vec() };
+    let response = SERVICE_CLIENT
         .lock()
         .unwrap()
         .call(|client| {
             client.update_features(UpdateFeaturesRequest {
                 id: FUZZER_ID.load(Ordering::SeqCst),
                 features,
+                corpus_id: match corpus_index {
+                    std::usize::MAX => NO_CORPUS_ID,
+                    index => index as u64,
+                },
             })
         })
-        .unwrap();
+        .unwrap()
+        .into_inner();
+    PENDING_CORPUS_PRIORITIES.with(|pending_corpus_priorities| {
+        *pending_corpus_priorities.borrow_mut() = response.corpus_priorities;
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn fuzzer_client_get_corpus_priorities(
+    buffer_ptr: *mut fuzzer_client_corpus_priority,
+    buffer_size: usize,
+) -> usize {
+    PENDING_CORPUS_PRIORITIES.with(|pending_corpus_priorities| {
+        let mut pending_corpus_priorities = pending_corpus_priorities.borrow_mut();
+        let priority_length = pending_corpus_priorities.len();
+        if buffer_size < priority_length {
+            return priority_length;
+        }
+
+        let buffer = unsafe { slice::from_raw_parts_mut(buffer_ptr, priority_length) };
+        for (slot, corpus_priority) in buffer.iter_mut().zip(pending_corpus_priorities.iter()) {
+            slot.index = corpus_priority.id as usize;
+            slot.priority = corpus_priority.priority;
+        }
+        pending_corpus_priorities.clear();
+        priority_length
+    })
 }
 
 fn initialize_service_client() {

@@ -1,5 +1,7 @@
 //===- FuzzerCorpus.h - Internal header for the Fuzzer ----------*- C++ -* ===//
 //
+// Copyright 2020 Google LLC
+//
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -11,6 +13,7 @@
 #ifndef LLVM_FUZZER_CORPUS
 #define LLVM_FUZZER_CORPUS
 
+#include "FuzzerClient.h"
 #include "FuzzerDataFlowTrace.h"
 #include "FuzzerDefs.h"
 #include "FuzzerIO.h"
@@ -38,6 +41,8 @@ struct InputInfo {
   bool HasFocusFunction = false;
   Vector<uint32_t> UniqFeatureSet;
   Vector<uint8_t> DataFlowTraceForFocusFunction;
+
+  uint32_t Priority = 0;
 };
 
 class InputCorpus {
@@ -239,6 +244,18 @@ class InputCorpus {
     return false;
   }
 
+  void
+  UpdateCorpusPriority(const fuzzer_client::CorpusPriority *CorpusPriorities,
+                       size_t NumCorpusPriorities) {
+    for (size_t Idx = 0; Idx < NumCorpusPriorities; ++Idx) {
+      const auto &CorpusPriority = CorpusPriorities[Idx];
+      Inputs[CorpusPriority.Index]->Priority = CorpusPriority.Priority;
+    }
+    if (NumCorpusPriorities > 0) {
+      UpdateCorpusDistribution();
+    }
+  }
+
   size_t NumFeatures() const { return NumAddedFeatures; }
   size_t NumFeatureUpdates() const { return NumUpdatedFeatures; }
 
@@ -276,7 +293,10 @@ private:
     std::iota(Intervals.begin(), Intervals.end(), 0);
     for (size_t i = 0; i < N; i++)
       Weights[i] = Inputs[i]->NumFeatures
-                       ? (i + 1) * (Inputs[i]->HasFocusFunction ? 1000 : 1)
+                       ? (i + 1) * ((Inputs[i]->HasFocusFunction ||
+                                     Inputs[i]->Priority > 0)
+                                        ? 1000
+                                        : 1)
                        : 0.;
     if (FeatureDebug) {
       for (size_t i = 0; i < N; i++)

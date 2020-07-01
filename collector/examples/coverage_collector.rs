@@ -72,7 +72,7 @@ impl ObserverInner {
         self.nodes = nodes;
     }
 
-    fn update_features(&mut self, bit_counters: &[(usize, u8)]) {
+    fn update_features(&mut self, bit_counters: &[(usize, u8)], corpus_id: Option<u64>) {
         let mut new_update = false;
         let mut new_function_names = Vec::new();
         for &(node_index, _) in bit_counters {
@@ -106,12 +106,13 @@ impl ObserverInner {
         }
         if new_update {
             println!(
-                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {}",
+                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {} / Corpus ID: {}",
                 self.covered_nodes,
                 self.covered_functions,
                 self.nodes.len(),
                 self.functions.len(),
                 self.frontiers.len(),
+                corpus_id.unwrap(),
             );
         }
         if !new_function_names.is_empty() {
@@ -129,8 +130,16 @@ impl collector_service::Observer for Observer {
             .create_fuzzer(fuzzer_id, struct_graph);
     }
 
-    async fn update_features(&self, _fuzzer_id: u64, bit_counters: &[(usize, u8)]) {
-        self.inner.lock().unwrap().update_features(bit_counters);
+    async fn update_features(
+        &self,
+        _fuzzer_id: u64,
+        bit_counters: &[(usize, u8)],
+        corpus_id: Option<u64>,
+    ) {
+        self.inner
+            .lock()
+            .unwrap()
+            .update_features(bit_counters, corpus_id);
     }
 }
 

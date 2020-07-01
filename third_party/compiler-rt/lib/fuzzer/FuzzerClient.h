@@ -17,9 +17,12 @@
 #ifndef FUZZER_CLIENT_H_
 #define FUZZER_CLIENT_H_
 
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 namespace fuzzer_client {
+
+const size_t NO_CORPUS_INDEX = (~(size_t)0);
 
 struct CfgPayloadData {
   const uint8_t *Buffer;
@@ -42,12 +45,22 @@ struct FuzzerClientParam {
   size_t ModulesSize;
 };
 
+struct CorpusPriority {
+  size_t Index;
+  uint32_t Priority;
+};
+
 } // namespace fuzzer_client
 
 extern "C" void
 fuzzer_client_init(const fuzzer_client::FuzzerClientParam *Param);
 
 extern "C" void fuzzer_client_update_features(const uint32_t *Features,
-                                              size_t FeaturesSize);
+                                              size_t FeaturesSize,
+                                              size_t CorpusIndex);
+
+extern "C" size_t
+fuzzer_client_get_corpus_priorities(fuzzer_client::CorpusPriority *Buffer,
+                                    size_t BufferSize);
 
 #endif // FUZZER_CLIENT_H_
