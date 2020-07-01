@@ -58,7 +58,7 @@ std::vector<fuzzer_client::Module> TracePC::GetFuzzerClientModules() {
 
     Modules.push_back({InternalModule.CfgPayload, CfgRemap});
   }
-  return std::move(Modules);
+  return Modules;
 }
 
 void TracePC::HandleCollectorInit(const uint8_t *CfgPayload,

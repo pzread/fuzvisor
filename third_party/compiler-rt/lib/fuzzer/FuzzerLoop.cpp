@@ -487,14 +487,7 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
     *FoundUniqFeatures = FoundUniqFeaturesOfII;
   PrintPulseAndReportSlowInput(Data, Size);
 
-  bool NeedToSample = !(FuzzerClientSampleRng() & (16384 - 1));
   size_t NumNewFeatures = Corpus.NumFeatureUpdates() - NumUpdatesBefore;
-  if (NeedToSample || NumNewFeatures) {
-    TPC.CollectFeatures(
-        [&](size_t Feature) { FullFeatureSetTmp.push_back(Feature); });
-    fuzzer_client_update_features(FullFeatureSetTmp.data(),
-                                  FullFeatureSetTmp.size());
-  }
   if (NumNewFeatures) {
     TPC.UpdateObservedPCs();
     auto NewII = Corpus.AddToCorpus({Data, Data + Size}, NumNewFeatures,
@@ -502,6 +495,29 @@ bool Fuzzer::RunOne(const uint8_t *Data, size_t Size, bool MayDeleteFile,
                                     UniqFeatureSetTmp, DFT, II);
     WriteFeatureSetToFile(Options.FeaturesDir, Sha1ToString(NewII->Sha1),
                           NewII->UniqFeatureSet);
+  }
+
+  bool NeedToSample = !(FuzzerClientSampleRng() & (16384 - 1));
+  if (NeedToSample || NumNewFeatures) {
+    TPC.CollectFeatures(
+        [&](size_t Feature) { FullFeatureSetTmp.push_back(Feature); });
+    fuzzer_client_update_features(
+        FullFeatureSetTmp.data(), FullFeatureSetTmp.size(),
+        NumNewFeatures ? (Corpus.size() - 1) : fuzzer_client::NO_CORPUS_INDEX);
+
+    size_t NumCorpusPriorities = fuzzer_client_get_corpus_priorities(
+        CorpusPrioritiesTmp.data(), CorpusPrioritiesTmp.size());
+    if (NumCorpusPriorities > CorpusPrioritiesTmp.size()) {
+      CorpusPrioritiesTmp.resize(NumCorpusPriorities);
+      NumCorpusPriorities = fuzzer_client_get_corpus_priorities(
+          CorpusPrioritiesTmp.data(), CorpusPrioritiesTmp.size());
+      assert(NumCorpusPriorities == CorpusPrioritiesTmp.size());
+    }
+    Corpus.UpdateCorpusPriority(CorpusPrioritiesTmp.data(),
+                                NumCorpusPriorities);
+  }
+
+  if (NumNewFeatures) {
     return true;
   }
   if (II && FoundUniqFeaturesOfII &&

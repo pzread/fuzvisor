@@ -69,7 +69,12 @@ impl collector_service::Observer for Observer {
         }
     }
 
-    fn update_nodes(&mut self, _fuzzer_id: u64, bit_counters: &[(usize, u8)]) {
+    fn update_nodes(
+        &mut self,
+        _fuzzer_id: u64,
+        bit_counters: &[(usize, u8)],
+        corpus_id: Option<u64>,
+    ) {
         let mut new_update = false;
         let mut new_function_names = Vec::new();
         for &(node_index, _) in bit_counters {
@@ -103,12 +108,13 @@ impl collector_service::Observer for Observer {
         }
         if new_update {
             println!(
-                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {}",
+                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {} / Corpus ID: {}",
                 self.covered_nodes,
                 self.covered_functions,
                 self.nodes.len(),
                 self.functions.len(),
                 self.frontiers.len(),
+                corpus_id.unwrap(),
             );
         }
         if !new_function_names.is_empty() {

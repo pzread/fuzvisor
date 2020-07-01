@@ -17,3 +17,4 @@ pub mod collector_proto {
 }
 
 pub const NO_SANCOV_INDEX: u64 = std::u64::MAX;
+pub const NO_CORPUS_ID: u64 = std::u64::MAX;

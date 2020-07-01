@@ -13,11 +13,15 @@
 // limitations under the License.
 
 mod fuzzer;
-use common::collector_proto::{
-    collector_service_server::CollectorService, collector_service_server::CollectorServiceServer,
-    structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
-    ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, StructureGraph,
-    UpdateFeaturesRequest, UpdateFeaturesResponse,
+use common::{
+    collector_proto::{
+        collector_service_server::CollectorService,
+        collector_service_server::CollectorServiceServer,
+        structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
+        ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, StructureGraph,
+        UpdateFeaturesRequest, UpdateFeaturesResponse,
+    },
+    NO_CORPUS_ID,
 };
 use fuzzer::Fuzzer;
 use std::{
@@ -29,7 +33,12 @@ use tonic::{Request, Response, Status};
 pub trait Observer {
     fn create_fuzzer(&mut self, fuzzer_id: u64, struct_graph: &StructureGraph);
 
-    fn update_nodes(&mut self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
+    fn update_nodes(
+        &mut self,
+        fuzzer_id: u64,
+        bit_counters: &[(usize, u8)],
+        corpus_id: Option<u64>,
+    );
 }
 
 pub type ObserverPtr = Arc<Mutex<dyn Observer + Send>>;
@@ -69,6 +78,10 @@ impl CollectorService for CollectorServiceImpl {
         let update_feature_req = req.into_inner();
         let fuzzer_id = update_feature_req.id;
         let features = update_feature_req.features;
+        let corpus_id = match update_feature_req.corpus_id {
+            NO_CORPUS_ID => None,
+            corpus_id => Some(corpus_id),
+        };
         let hit_bit_counters = self
             .fuzzer_map
             .lock()
@@ -79,8 +92,10 @@ impl CollectorService for CollectorServiceImpl {
         self.observer
             .lock()
             .unwrap()
-            .update_nodes(fuzzer_id, &hit_bit_counters);
-        Ok(Response::new(UpdateFeaturesResponse {}))
+            .update_nodes(fuzzer_id, &hit_bit_counters, corpus_id);
+        Ok(Response::new(UpdateFeaturesResponse {
+            corpus_priorities: Vec::new(),
+        }))
     }
 }
 

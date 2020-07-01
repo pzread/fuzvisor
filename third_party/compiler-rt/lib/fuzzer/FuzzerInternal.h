@@ -13,6 +13,7 @@
 #ifndef LLVM_FUZZER_INTERNAL_H
 #define LLVM_FUZZER_INTERNAL_H
 
+#include "FuzzerClient.h"
 #include "FuzzerDataFlowTrace.h"
 #include "FuzzerDefs.h"
 #include "FuzzerExtFunctions.h"
@@ -144,7 +145,7 @@ private:
 
   Vector<uint32_t> UniqFeatureSetTmp;
   Vector<uint32_t> FullFeatureSetTmp;
-
+  Vector<fuzzer_client::CorpusPriority> CorpusPrioritiesTmp;
   std::mt19937 FuzzerClientSampleRng = std::mt19937(23);
 
   // Need to know our own thread.
