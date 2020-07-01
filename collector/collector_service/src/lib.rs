@@ -125,12 +125,12 @@ fn build_structure_graph(cfg: &ControlFlowGraph) -> StructureGraph {
                         successors
                     },
                 },
-            ))
+            ));
         }
         functions.push(GraphFunction {
             name: cfg_function.name.clone(),
             node_indices,
-        })
+        });
     }
     node_pairs.sort_by_key(|(node_index, _)| *node_index);
     let mut nodes: Vec<GraphNode> = node_pairs
@@ -138,7 +138,8 @@ fn build_structure_graph(cfg: &ControlFlowGraph) -> StructureGraph {
         .map(|(_, graph_node)| graph_node)
         .collect();
     for node_index in 0..nodes.len() {
-        for successor in nodes[node_index].successors.clone() {
+        for successor_index in 0..nodes[node_index].successors.len() {
+            let successor = nodes[node_index].successors[successor_index];
             nodes[successor as usize]
                 .predecessors
                 .push(node_index as u64);
