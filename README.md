@@ -49,3 +49,10 @@ Then the collecting server will start showing the coverage information.
 
 Developer Guides (WIP)
 ---------------
+**Component Overview**
+
+![components_overview](./docs/images/components_overview.svg)
+
+**Execution Flow**
+
+![execution_flow](./docs/images/execution_flow.svg)
