@@ -42,7 +42,7 @@ struct InputInfo {
   Vector<uint32_t> UniqFeatureSet;
   Vector<uint8_t> DataFlowTraceForFocusFunction;
 
-  uint32_t Priority = 0;
+  uint32_t Priority = 1;
 };
 
 class InputCorpus {
@@ -291,13 +291,13 @@ private:
     Intervals.resize(N + 1);
     Weights.resize(N);
     std::iota(Intervals.begin(), Intervals.end(), 0);
-    for (size_t i = 0; i < N; i++)
-      Weights[i] = Inputs[i]->NumFeatures
-                       ? (i + 1) * ((Inputs[i]->HasFocusFunction ||
-                                     Inputs[i]->Priority > 0)
-                                        ? 1000
-                                        : 1)
-                       : 0.;
+    for (size_t i = 0; i < N; i++) {
+      Weights[i] =
+          Inputs[i]->NumFeatures
+              ? (i + 1) *
+                    (Inputs[i]->HasFocusFunction ? 1000 : Inputs[i]->Priority)
+              : 0.;
+    }
     if (FeatureDebug) {
       for (size_t i = 0; i < N; i++)
         Printf("%zd ", Inputs[i]->NumFeatures);

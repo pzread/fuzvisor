@@ -111,7 +111,6 @@ impl collector_service::Observer for Observer {
             }
             new_update = true;
         }
-
         if let Some(corpus_id) = corpus_id {
             for &(node_index, _) in bit_counters {
                 let frontier = match self.frontiers.get_mut(&node_index) {
@@ -121,53 +120,58 @@ impl collector_service::Observer for Observer {
                 frontier.push((fuzzer_id, corpus_id));
             }
         }
+
         let mut hist = Vec::new();
+        let mut freq_denominator = 1;
         for (&node_index, frontier) in self.frontiers.iter() {
-            hist.push((self.freqs[node_index], frontier));
+            hist.push((self.freqs[node_index], frontier.as_slice()));
+            freq_denominator = freq_denominator.max(self.freqs[node_index]);
         }
         hist.sort_by_key(|&(freq, _)| freq);
-        let new_prio_corpus_ids: HashSet<u64> = hist
-            .iter()
-            .take((hist.len() + 9) / 10)
-            .map(|(_, frontier)| frontier.iter())
-            .flatten()
-            .filter_map(|&(corpus_fuzzer_id, corpus_id)| {
-                if corpus_fuzzer_id == fuzzer_id {
-                    Some(corpus_id)
-                } else {
-                    None
-                }
-            })
+        let hist: Vec<(f64, &[(u64, u64)])> = hist
+            .into_iter()
+            .map(|(freq, frontier)| (freq as f64 / freq_denominator as f64, frontier))
             .collect();
-        let prio_corpuses = self.prio_corpuses.entry(fuzzer_id).or_default();
-        let reset_prios: Vec<(u64, u32)> = prio_corpuses
-            .difference(&new_prio_corpus_ids)
-            .copied()
-            .map(|corpus_id| (corpus_id, 0))
+        let hist_list: Vec<f64> = hist
+            .chunks((hist.len() + 9) / 10)
+            .map(|chunk| chunk.last().unwrap().0)
             .collect();
-        let set_prios: Vec<(u64, u32)> = new_prio_corpus_ids
-            .difference(&prio_corpuses)
-            .copied()
-            .map(|corpus_id| (corpus_id, 1))
-            .collect();
-        *prio_corpuses = new_prio_corpus_ids;
-        let update_prios = [reset_prios, set_prios].concat();
 
-        if new_update {
+        let prio_corpus_ids = self.prio_corpuses.entry(fuzzer_id).or_default();
+        let mut new_prio_corpuses: HashMap<u64, u32> = prio_corpus_ids
+            .iter()
+            .map(|&corpus_id| (corpus_id, 1))
+            .collect();
+        for (freq, frontier) in hist {
+            for &(corpus_fuzzer_id, corpus_id) in frontier {
+                if corpus_fuzzer_id != fuzzer_id {
+                    continue;
+                }
+                let weight = new_prio_corpuses.entry(corpus_id).or_insert(1);
+                *weight = (*weight).max((1.0 / freq.min(0.001)) as u32);
+            }
+        }
+        *prio_corpus_ids = new_prio_corpuses
+            .iter()
+            .filter_map(|(&corpus_id, &weight)| if weight != 1 { Some(corpus_id) } else { None })
+            .collect();
+
+        if new_update || !new_prio_corpuses.is_empty() {
+            println!("{:.3?}", hist_list);
             println!(
-                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {} / Prios: {}",
+                "Covered Nodes: {} ({}) / Total Nodes: {} ({}) / Frontiers: {} / Update Prios: {}",
                 self.covered_nodes,
                 self.covered_functions,
                 self.nodes.len(),
                 self.functions.len(),
                 self.frontiers.len(),
-                update_prios.len(),
+                new_prio_corpuses.len(),
             );
         }
         if !new_function_names.is_empty() {
             println!("New Functions: {:?}", new_function_names);
         }
-        update_prios
+        new_prio_corpuses.into_iter().collect()
     }
 }
 
