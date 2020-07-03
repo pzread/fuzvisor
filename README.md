@@ -47,6 +47,13 @@ Same as running a `libfuzzer` target. For example:
 
 Then the collecting server will start showing the coverage information.
 
+Branches
+--------
+This is a heavy-experiment-oriented project. There are some rapid changes on protocol and API in order to support new experiments. Those changes might not be well designed and hacky, therefore they are not directly merged back to the main branch. However, if you find some useful functions are missing, they might have been supported in the branches below.
+| Branch                                                                               | Description           |
+|--------------------------------------------------------------------------------------|-----------------------|
+| [exp-priority-control](https://github.com/pzread/fuzvisor/tree/exp-priority-control) | Seed priority control |
+
 Developer Guides (WIP)
 ---------------
 **Component Overview**
