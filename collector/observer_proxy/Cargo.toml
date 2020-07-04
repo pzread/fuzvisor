@@ -1,13 +1,14 @@
 [package]
-name = "collector_service"
+name = "observer_proxy"
 version = "0.1.0"
 license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
+clap = "2.0"
+collector_service = { path = "../collector_service" }
 common = { path = "../common" }
-lazy_static = "1.4"
 prost = "0.6"
-tokio = { version = "0.2" }
+tokio = { version = "0.2", features = ["macros"] }
 tonic = "0.2"

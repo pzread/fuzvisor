@@ -13,33 +13,37 @@
 // limitations under the License.
 
 mod fuzzer;
-use common::collector_proto::{
-    collector_service_server::CollectorService, collector_service_server::CollectorServiceServer,
-    structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
-    ControlFlowGraph, CreateFuzzerRequest, CreateFuzzerResponse, StructureGraph,
-    UpdateFeaturesRequest, UpdateFeaturesResponse,
+use async_trait::async_trait;
+use common::{
+    collector_proto::{
+        collector_service_server::CollectorService,
+        collector_service_server::CollectorServiceServer, ControlFlowGraph, CreateFuzzerRequest,
+        CreateFuzzerResponse, UpdateFeaturesRequest, UpdateFeaturesResponse,
+    },
+    observer_proto::{
+        structure_graph::Function as GraphFunction, structure_graph::Node as GraphNode,
+        StructureGraph,
+    },
 };
 use fuzzer::Fuzzer;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Mutex};
 use tonic::{Request, Response, Status};
 
+#[async_trait]
 pub trait Observer {
-    fn create_fuzzer(&mut self, fuzzer_id: u64, struct_graph: &StructureGraph);
+    async fn create_fuzzer(&self, fuzzer_id: u64, struct_graph: &StructureGraph);
 
-    fn update_nodes(&mut self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
+    async fn update_features(&self, fuzzer_id: u64, bit_counters: &[(usize, u8)]);
 }
 
-pub type ObserverPtr = Arc<Mutex<dyn Observer + Send>>;
+pub type ObserverPtr = Box<dyn Observer + Sync + Send>;
 
 pub struct CollectorServiceImpl {
     fuzzer_map: Mutex<HashMap<u64, Fuzzer>>,
     observer: ObserverPtr,
 }
 
-#[tonic::async_trait]
+#[async_trait]
 impl CollectorService for CollectorServiceImpl {
     async fn create_fuzzer(
         &self,
@@ -50,14 +54,13 @@ impl CollectorService for CollectorServiceImpl {
 
         let struct_graph = build_structure_graph(&cfg);
         let fuzzer = Fuzzer::new(&struct_graph, cfg);
-        let mut fuzzer_map = self.fuzzer_map.lock().unwrap();
-        let fuzzer_id = fuzzer_map.len() as u64;
-        fuzzer_map.insert(fuzzer_id, fuzzer);
-
-        self.observer
-            .lock()
-            .unwrap()
-            .create_fuzzer(fuzzer_id, &struct_graph);
+        let fuzzer_id = {
+            let mut fuzzer_map = self.fuzzer_map.lock().unwrap();
+            let fuzzer_id = fuzzer_map.len() as u64;
+            fuzzer_map.insert(fuzzer_id, fuzzer);
+            fuzzer_id
+        };
+        self.observer.create_fuzzer(fuzzer_id, &struct_graph).await;
 
         Ok(Response::new(CreateFuzzerResponse { id: fuzzer_id }))
     }
@@ -69,6 +72,7 @@ impl CollectorService for CollectorServiceImpl {
         let update_feature_req = req.into_inner();
         let fuzzer_id = update_feature_req.id;
         let features = update_feature_req.features;
+
         let hit_bit_counters = self
             .fuzzer_map
             .lock()
@@ -77,9 +81,9 @@ impl CollectorService for CollectorServiceImpl {
             .unwrap()
             .update_features(&features);
         self.observer
-            .lock()
-            .unwrap()
-            .update_nodes(fuzzer_id, &hit_bit_counters);
+            .update_features(fuzzer_id, &hit_bit_counters)
+            .await;
+
         Ok(Response::new(UpdateFeaturesResponse {}))
     }
 }

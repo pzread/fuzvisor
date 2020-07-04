@@ -5,6 +5,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1"
 collector_service = { path = "../collector_service" }
 common = { path = "../common" }
 lazy_static = "1.4"
