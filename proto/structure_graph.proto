@@ -13,7 +13,7 @@
 // limitations under the License.
 
 syntax = "proto3";
-package collector;
+package observer;
 
 message StructureGraph {
     message Node {
