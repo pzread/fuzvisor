@@ -47,6 +47,25 @@ Same as running a `libfuzzer` target. For example:
 
 Then the collecting server will start showing the coverage information.
 
+**Observer proxy**
+
+Instead of using the collecting server written in Rust, you also run the `observer_proxy` and let it proxy data to a gRPC server implementing `observer_service` in any programming language.
+
+For example:
+```sh
+cargo run --release --bin observer_proxy -- --listen_addr [::1]:2501 --observer_url http://{your observer service server}
+```
+
+You can also try the example `coverage_observer.py` by following the steps below, and see more details in the code.
+```sh
+cd fuzvisor/collector/examples/python
+pip install -f requirements.txt
+./build.sh
+python coverage_observer.py
+```
+
+Then start your fuzzing target.
+
 Demo
 ----
 [![asciicast](https://asciinema.org/a/kk92e269awcA6ZCTFB6Nmj1mR.svg)](https://asciinema.org/a/kk92e269awcA6ZCTFB6Nmj1mR)

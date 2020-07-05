@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use common::collector_proto::{structure_graph::Node as GraphNode, StructureGraph};
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
+use async_trait::async_trait;
+use common::observer_proto::{structure_graph::Node as GraphNode, StructureGraph};
+use std::{collections::HashSet, sync::Mutex};
 use tonic::transport::Server;
 
 struct Node {
@@ -31,7 +29,7 @@ struct Function {
     covered_nodes: usize,
 }
 
-struct Observer {
+struct ObserverInner {
     nodes: Vec<Node>,
     functions: Vec<Function>,
     frontiers: HashSet<usize>,
@@ -39,37 +37,42 @@ struct Observer {
     covered_functions: usize,
 }
 
-impl collector_service::Observer for Observer {
+struct Observer {
+    inner: Mutex<ObserverInner>,
+}
+
+impl ObserverInner {
     fn create_fuzzer(&mut self, fuzzer_id: u64, struct_graph: &StructureGraph) {
-        if fuzzer_id == 0 {
-            self.functions = struct_graph
-                .functions
-                .iter()
-                .map(|graph_function| Function {
-                    name: graph_function.name.clone(),
-                    covered_nodes: 0,
-                })
-                .collect();
-            let mut nodes: Vec<Node> = struct_graph
-                .nodes
-                .iter()
-                .map(|graph_node| Node {
-                    graph_node: graph_node.clone(),
-                    function_index: 0,
-                    covered: false,
-                    uncovered_successors: graph_node.successors.len(),
-                })
-                .collect();
-            for (function_index, graph_function) in struct_graph.functions.iter().enumerate() {
-                for node_index in graph_function.node_indices.iter() {
-                    nodes[*node_index as usize].function_index = function_index;
-                }
-            }
-            self.nodes = nodes;
+        if fuzzer_id != 0 {
+            return;
         }
+        self.functions = struct_graph
+            .functions
+            .iter()
+            .map(|graph_function| Function {
+                name: graph_function.name.clone(),
+                covered_nodes: 0,
+            })
+            .collect();
+        let mut nodes: Vec<Node> = struct_graph
+            .nodes
+            .iter()
+            .map(|graph_node| Node {
+                graph_node: graph_node.clone(),
+                function_index: 0,
+                covered: false,
+                uncovered_successors: graph_node.successors.len(),
+            })
+            .collect();
+        for (function_index, graph_function) in struct_graph.functions.iter().enumerate() {
+            for node_index in graph_function.node_indices.iter() {
+                nodes[*node_index as usize].function_index = function_index;
+            }
+        }
+        self.nodes = nodes;
     }
 
-    fn update_nodes(&mut self, _fuzzer_id: u64, bit_counters: &[(usize, u8)]) {
+    fn update_features(&mut self, bit_counters: &[(usize, u8)]) {
         let mut new_update = false;
         let mut new_function_names = Vec::new();
         for &(node_index, _) in bit_counters {
@@ -117,17 +120,33 @@ impl collector_service::Observer for Observer {
     }
 }
 
+#[async_trait]
+impl collector_service::Observer for Observer {
+    async fn create_fuzzer(&self, fuzzer_id: u64, struct_graph: &StructureGraph) {
+        self.inner
+            .lock()
+            .unwrap()
+            .create_fuzzer(fuzzer_id, struct_graph);
+    }
+
+    async fn update_features(&self, _fuzzer_id: u64, bit_counters: &[(usize, u8)]) {
+        self.inner.lock().unwrap().update_features(bit_counters);
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:2501".parse().unwrap();
-    println!("CollectorService listening on {}.", addr);
-    let observer_ptr = Arc::new(Mutex::new(Observer {
-        nodes: Vec::new(),
-        functions: Vec::new(),
-        frontiers: HashSet::new(),
-        covered_nodes: 0,
-        covered_functions: 0,
-    }));
+    println!("Collector Service listening on {}.", addr);
+    let observer_ptr = Box::new(Observer {
+        inner: Mutex::new(ObserverInner {
+            nodes: Vec::new(),
+            functions: Vec::new(),
+            frontiers: HashSet::new(),
+            covered_nodes: 0,
+            covered_functions: 0,
+        }),
+    });
     Server::builder()
         .add_service(collector_service::create_service(observer_ptr))
         .serve(addr)

@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "../../proto/control_flow_graph.proto",
             "../../proto/collector_service.proto",
             "../../proto/structure_graph.proto",
+            "../../proto/observer_service.proto",
         ],
         &["../../proto"],
     )?;

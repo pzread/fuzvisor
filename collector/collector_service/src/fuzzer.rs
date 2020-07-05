@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use common::{
-    collector_proto::{structure_graph::Node as GraphNode, ControlFlowGraph, StructureGraph},
+    collector_proto::ControlFlowGraph,
+    observer_proto::{structure_graph::Node as GraphNode, StructureGraph},
     NO_SANCOV_INDEX,
 };
 use std::{cmp, collections::HashMap, iter};
@@ -87,20 +88,20 @@ impl Fuzzer {
         let mut sancov_edge_map: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
         let mut visiting_map = vec![NO_SANCOV_INDEX; graph_nodes.len()];
         for node_index in 0..graph_nodes.len() {
-            if let Some(source_sancov_index) = node_sancov_map.get(&node_index) {
-                let mut path = Vec::new();
-                Self::path_traverse(
-                    graph_nodes,
-                    node_sancov_map,
-                    node_index,
-                    *source_sancov_index,
-                    &mut path,
-                    &mut sancov_edge_map,
-                    &mut visiting_map,
-                );
-            } else {
-                assert!(!graph_nodes[node_index].predecessors.is_empty());
-            }
+            let source_sancov_index = match node_sancov_map.get(&node_index) {
+                Some(sancov_index) => sancov_index,
+                None => continue,
+            };
+            let mut path = Vec::new();
+            Self::path_traverse(
+                graph_nodes,
+                node_sancov_map,
+                node_index,
+                *source_sancov_index,
+                &mut path,
+                &mut sancov_edge_map,
+                &mut visiting_map,
+            );
         }
         let mut sancov_edge_dict: HashMap<u32, Vec<(u32, Vec<usize>)>> = HashMap::new();
         for ((src, dst), covered_nodes) in sancov_edge_map {

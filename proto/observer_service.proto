@@ -12,12 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod collector_proto {
-    tonic::include_proto!("collector");
+syntax = "proto3";
+package observer;
+
+import "structure_graph.proto";
+
+service ObserverService {
+  rpc CreateFuzzer(CreateFuzzerRequest) returns (CreateFuzzerResponse);
+
+  rpc UpdateFeatures(UpdateFeaturesRequest) returns (UpdateFeaturesResponse);
 }
 
-pub mod observer_proto {
-    tonic::include_proto!("observer");
+message CreateFuzzerRequest {
+  uint64 fuzzer_id = 1;
+  StructureGraph structure_graph = 2;
 }
 
-pub const NO_SANCOV_INDEX: u64 = std::u64::MAX;
+message CreateFuzzerResponse {}
+
+message UpdateFeaturesRequest {
+  uint64 fuzzer_id = 1;
+
+  message BitCounter {
+    uint64 node_index = 1;
+    uint32 counter = 2;
+  }
+  repeated BitCounter bit_counters = 2;
+}
+
+message UpdateFeaturesResponse {}
