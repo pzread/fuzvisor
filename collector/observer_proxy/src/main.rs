@@ -18,6 +18,7 @@ use common::observer_proto::{
     observer_service_client::ObserverServiceClient, update_features_request::BitCounter,
     CreateFuzzerRequest, StructureGraph, UpdateFeaturesRequest,
 };
+use std::u64;
 use tokio::sync::Mutex;
 use tonic::transport::Server;
 
@@ -35,7 +36,12 @@ impl collector_service::Observer for Proxy {
         self.client.lock().await.create_fuzzer(req).await.unwrap();
     }
 
-    async fn update_features(&self, fuzzer_id: u64, bit_counters: &[(usize, u8)]) {
+    async fn update_features(
+        &self,
+        fuzzer_id: u64,
+        bit_counters: &[(usize, u8)],
+        corpus_id: Option<u64>,
+    ) -> Vec<(u64, u32)> {
         let req = UpdateFeaturesRequest {
             fuzzer_id,
             bit_counters: bit_counters
@@ -45,8 +51,20 @@ impl collector_service::Observer for Proxy {
                     counter: counter as u32,
                 })
                 .collect(),
+            corpus_id: corpus_id.unwrap_or(u64::MAX),
         };
-        self.client.lock().await.update_features(req).await.unwrap();
+        let res = self
+            .client
+            .lock()
+            .await
+            .update_features(req)
+            .await
+            .unwrap()
+            .into_inner();
+        res.corpus_priorities
+            .into_iter()
+            .map(|corpus_priority| (corpus_priority.id, corpus_priority.priority))
+            .collect()
     }
 }
 

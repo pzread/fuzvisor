@@ -38,6 +38,14 @@ message UpdateFeaturesRequest {
     uint32 counter = 2;
   }
   repeated BitCounter bit_counters = 2;
+
+  uint64 corpus_id = 3;
 }
 
-message UpdateFeaturesResponse {}
+message UpdateFeaturesResponse {
+  message CorpusPriority {
+    uint64 id = 1;
+    uint32 priority = 2;
+  }
+  repeated CorpusPriority corpus_priorities = 1;
+}
