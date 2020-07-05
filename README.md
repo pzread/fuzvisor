@@ -47,6 +47,10 @@ Same as running a `libfuzzer` target. For example:
 
 Then the collecting server will start showing the coverage information.
 
+Demo
+----
+[![asciicast](https://asciinema.org/a/kk92e269awcA6ZCTFB6Nmj1mR.svg)](https://asciinema.org/a/kk92e269awcA6ZCTFB6Nmj1mR)
+
 Branches
 --------
 This is a heavy-experiment-oriented project. There are some rapid changes on protocol and API in order to support new experiments. Those changes might not be well designed and hacky, therefore they are not directly merged back to the main branch. However, if you find some useful functions are missing, they might have been supported in the branches below.
