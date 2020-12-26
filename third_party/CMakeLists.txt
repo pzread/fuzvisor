@@ -13,7 +13,7 @@
 # limitations under the License.
 
 ExternalProject_Add(clang
-  URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang-10.0.0.src.tar.xz"
+  URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.0/clang-11.0.0.src.tar.xz"
   PATCH_COMMAND patch -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/clang.patch
   BUILD_COMMAND ""
   CONFIGURE_COMMAND ""
@@ -22,7 +22,7 @@ ExternalProject_Add(clang
 
 get_target_property(FUZZER_CLIENT_LIB_PATH fuzzer_client FUZZER_CLIENT_LIB_PATH)
 ExternalProject_Add(llvm
-  URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/llvm-10.0.0.src.tar.xz"
+  URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.0/llvm-11.0.0.src.tar.xz"
   CMAKE_ARGS
     -DFUZZER_CLIENT_LIB_PATH=${FUZZER_CLIENT_LIB_PATH}
     -DCOLLECTOR_PASS_LIB_PATH=${COLLECTOR_PASS_LIB_PATH}

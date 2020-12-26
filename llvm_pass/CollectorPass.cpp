@@ -25,7 +25,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Pass.h"
-#include "llvm/PassSupport.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Instrumentation.h"
@@ -221,7 +220,7 @@ ControlFlowGraph::Function CollectorPass::BuildFunctionCFG(
     const std::unordered_map<const BasicBlock *, uint64_t> &MarkMap) {
   ControlFlowGraph::Function CfgF;
   CfgF.set_id(GenerateID());
-  CfgF.set_name(F.getName());
+  CfgF.set_name(F.getName().str());
 
   std::unordered_map<const BasicBlock *, ControlFlowGraph::BasicBlock *> BBMap;
   for (const BasicBlock &BB : F) {
@@ -255,7 +254,7 @@ ControlFlowGraph CollectorPass::BuildCFG(
   ControlFlowGraph Cfg;
 
   for (const Function &F : M) {
-    const std::string FuncName = F.getName();
+    const std::string FuncName = F.getName().str();
     if (F.size() == 0 || FuncName.find("sancov.") == 0) {
       continue;
     }
