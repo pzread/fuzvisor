@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 find_package(Protobuf CONFIG REQUIRED)
-find_package(LLVM 10.0 CONFIG REQUIRED)
+find_package(LLVM 11.0 CONFIG REQUIRED)
 
 project(llvm_pass)
 
