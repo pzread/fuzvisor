@@ -24,9 +24,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(server_url: &str) -> Self {
-        let runtime = runtime::Builder::new()
-            .basic_scheduler()
-            .core_threads(1)
+        let runtime = runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();

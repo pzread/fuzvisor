@@ -9,6 +9,6 @@ async-trait = "0.1"
 clap = "2.0"
 collector_service = { path = "../collector_service" }
 common = { path = "../common" }
-prost = "0.6"
-tokio = { version = "0.2", features = ["macros"] }
-tonic = "0.2"
+prost = "0.7"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tonic = "0.4"

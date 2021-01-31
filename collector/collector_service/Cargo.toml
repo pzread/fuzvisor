@@ -8,6 +8,6 @@ edition = "2018"
 async-trait = "0.1"
 common = { path = "../common" }
 lazy_static = "1.4"
-prost = "0.6"
-tokio = { version = "0.2" }
-tonic = "0.2"
+prost = "0.7"
+tokio = "1.0"
+tonic = "0.4"
